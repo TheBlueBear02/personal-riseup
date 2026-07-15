@@ -11,21 +11,25 @@ This document is the single source of truth for the build. It contains everythin
 **Goal:** Connect an auto-updating Google Sheets file to a web app that shows, over the full timeline:
 
 - **Net worth** (assets total) over time
+- **Asset allocation** (latest month): % and ₪ per asset type from the assets tab line items
+- **Expense breakdown**: pie of expense types for a selected month (current year) or year summary (YTD / past years)
+- **Expense type history**: pick a type → monthly amounts over time (with timeframe filter)
 - **Monthly cash flow** (the Riseup "hero" number: income − expenses)
 - **Income vs. expenses** over time
-- A small set of **insights** derived purely from those totals
+- A small set of **insights** derived from those totals + latest allocation
 
 **Design language:** Riseup-inspired — calm, green-forward, one big hero number, minimal chrome. Hebrew UI, right-to-left (RTL). Currency is **₪ (ILS) only**.
 
 **Explicitly OUT of scope for the MVP** (do not build these yet):
 
 - ❌ FIRE math (safe-withdrawal %, "years of living" / שנות מחייה, 3%/4% columns)
-- ❌ Category/group breakdowns (needs/wants/housing/subscriptions, active/passive, per-account) — **totals over time only**
+- ❌ Income-side category pie (work / passive / freelance) — income stays total-only for now
+- ❌ Budget / "expected to spend" bars
 - ❌ Multi-currency ($ / €) — those are derived columns; ignore them
 - ❌ Any writing back to the sheet — **read-only**
 - ❌ Auth / multi-user — single owner, see deployment note
 
-These are deliberate. Everything the app shows is computed from **four totals per month**: net worth, income, expenses, cash flow.
+Totals timeline is still the core. Asset and expense **types** come from `eras.config` line-item lists, not from scanning sheet headers.
 
 ---
 
@@ -52,11 +56,11 @@ Because the totals (`סה"כ` / `סה"כ ברוטו`) exist in every era, the ti
 |---|---|---|
 | Framework | **Next.js (App Router) + TypeScript** | Server-side data fetch keeps the Google service-account key off the client; great Cursor support |
 | Styling | **Tailwind CSS** | Fast, RTL-friendly |
-| Charts | **Recharts** | Simple, declarative, good enough for line/area charts |
+| Charts | **Recharts** | Simple, declarative, good enough for line/area charts. **Must pin `react-is` to the same major as React** (via `dependencies` + `overrides`) — Recharts otherwise pulls `react-is@16`, and chart children render blank under React 19. Charts load via `ClientCharts` → `dynamic(..., { ssr: false })` (must be in a Client Component in Next 16), sized by `ChartContainer` (viewport fallback, never zero width, no focus outlines on `.recharts-wrapper` / `.recharts-surface`), and `isAnimationActive={false}` for mobile Safari |
 | Sheets access | **`googleapis`** (official Node client) | Service-account auth, `spreadsheets.values.get` |
 | Font | **Rubik** (or **Heebo**) via `next/font` | Rounded, Hebrew-first — closest free match to Riseup's typography |
 | Layout | **Mobile-first, responsive** | Riseup is a phone app; the reference screens are all portrait. Must look right on a phone and gracefully widen on desktop |
-| Deployment (MVP) | **localhost** (`next dev`) | Simplest + most private for financial data. Vercel + password is a documented future step, not MVP |
+| Deployment (MVP) | **localhost** (`next dev`) | Simplest + most private for financial data. Vercel + password is a documented future step, not MVP. **Phone on LAN:** run `npm run dev -- -H 0.0.0.0`, put your PC LAN IP in `next.config.ts` → `allowedDevOrigins` (otherwise SSR numbers load but chart JS is blocked) |
 
 > **Security rule (non-negotiable):** the service-account JSON key is a server-only secret. It must never be imported into a client component or exposed in the browser bundle. All Google Sheets calls happen in server code (route handler or server component).
 
@@ -83,6 +87,12 @@ Google Sheets (owner updates monthly)
 The **unified timeline** the rest of the app consumes is just an array of monthly points:
 
 ```ts
+type BreakdownItem = {
+  id: string;
+  label: string;
+  value: number;
+};
+
 type MonthPoint = {
   yearMonth: string;   // "2024-03"  — the join key across both tables
   date: string;        // display string, e.g. "31.03.2024"
@@ -91,6 +101,8 @@ type MonthPoint = {
   expenses: number | null;
   cashflow: number | null;   // income − expenses (prefer sheet's total; fallback to computed)
   eraId: string;       // which era this month came from
+  assets: BreakdownItem[];           // per-type amounts from assets lineItems
+  expenseBreakdown: BreakdownItem[]; // per-type amounts from expenseLineItems
 };
 ```
 
@@ -100,16 +112,21 @@ Assets and income/expenses are **two separate tables** (in most eras, two separa
 
 ## 5. The era config (the heart of the app)
 
-Create `eras.config.ts`. Each era declares, **per table**: the tab name, the date column, and the total column(s), addressed by **spreadsheet column letter** (A, B, C…). Column letters are used instead of header text because the income/expenses tabs have **merged multi-row banner headers** (`הכנסות` / `הוצאות` / `תזרים`) that make header-matching fragile.
-
-> For the MVP (totals only) you do **not** need to list individual line items. A commented `lineItems` field is included as a documented extension point for later; leave it out for now.
+Create `eras.config.ts`. Each era declares, **per table**: the tab name, the date column, the total column(s), assets **`lineItems`**, and income/expenses **`expenseLineItems`** — addressed by **spreadsheet column letter** (A, B, C…). Column letters are used instead of header text because the income/expenses tabs have **merged multi-row banner headers** (`הכנסות` / `הוצאות` / `תזרים`) that make header-matching fragile.
 
 ```ts
 // eras.config.ts
+export type LineItem = {
+  id: string;
+  label: string; // Hebrew (or English) label shown in allocation pies
+  col: string;
+};
+
 export type AssetsTableConfig = {
   tab: string;          // exact tab name
   dateCol: string;      // column letter of the date
   totalCol: string;     // column letter of net-worth total (סה"כ / סה"כ ברוטו)
+  lineItems: LineItem[]; // asset types only — never include the סה״כ column
 };
 
 export type IncomeExpensesTableConfig = {
@@ -118,6 +135,7 @@ export type IncomeExpensesTableConfig = {
   incomeTotalCol: string;    // income סה"כ
   expensesTotalCol: string;  // expenses סה"כ
   cashflowTotalCol: string;  // תזרים סה"כ
+  expenseLineItems: LineItem[]; // expense types — never include the expenses סה״כ column
 };
 
 export type Era = {
@@ -126,45 +144,17 @@ export type Era = {
   assets: AssetsTableConfig;
   incomeExpenses: IncomeExpensesTableConfig;
 };
-
-// ⚠️ Column letters below are PLACEHOLDERS. The owner fills them in — see §11, step F.
-export const ERAS: Era[] = [
-  {
-    id: "current",
-    label: "נוכחי",
-    assets: {
-      tab: "דוח נכסים",
-      dateCol: "TODO",     // date column
-      totalCol: "TODO",    // סה"כ ברוטו
-    },
-    incomeExpenses: {
-      tab: "הכנסות הוצאות",
-      dateCol: "TODO",
-      incomeTotalCol: "TODO",
-      expensesTotalCol: "TODO",
-      cashflowTotalCol: "TODO",
-    },
-  },
-  {
-    id: "army",
-    label: "צבא",
-    assets: {
-      tab: "דוח נכסים - צבא",
-      dateCol: "TODO",
-      totalCol: "TODO",    // סה"כ
-    },
-    incomeExpenses: {
-      tab: "הכנסות הוצאות - צבא",
-      dateCol: "TODO",
-      incomeTotalCol: "TODO",
-      expensesTotalCol: "TODO",
-      cashflowTotalCol: "TODO",
-    },
-  },
-];
 ```
 
-**Adding a future era** = append one more object to `ERAS`. No other code changes.
+**Current era asset line items (דוח נכסים):** B עו״ש · C תיק השקעות IB · D קופת גמל · E קרן כספית בבנק (total = F).
+
+**Army era asset line items (דוח נכסים - צבא):** B עו״ש · C תיק השקעות Pepper · D תיק דרך אבא · E קופת גמל · F חסכון לכל ילד (total = G).
+
+**Current era expense line items (הכנסות הוצאות):** K–AC individual categories (אוכל, שכירות, Cursor, …); expenses total = AD.
+
+**Army era expense line items (הכנסות הוצאות - צבא):** J אוכל · M פלאפון · N סלקום TV · O כרטיסים · P השכלה · Q שונות (total = R).
+
+**Adding a future era** = append one more object to `ERAS` (including `lineItems` + `expenseLineItems`). No other code changes.
 
 ---
 
@@ -195,7 +185,7 @@ colToIndex(letter) = sum over chars of (charCodeUpper - 64), in base 26, minus 1
 3. **`yearMonth` key** = `YYYY-MM` derived from the parsed date. This is how a month in the assets tab is matched to the same month in the income/expenses tab. (It also gracefully handles the odd `31.11.2023`-style value in the data — we key on year+month, not the exact day.)
 
 ### 6.5 Normalization (`normalize.ts`)
-- For each era: read the assets tab → produce `{yearMonth, netWorth}` rows; read the income/expenses tab → produce `{yearMonth, income, expenses, cashflow}` rows.
+- For each era: read the assets tab → produce `{yearMonth, netWorth, assets[]}` rows; read the income/expenses tab → produce `{yearMonth, income, expenses, cashflow, expenseBreakdown[]}` rows.
 - **Merge** the two on `yearMonth` within the era, then concatenate all eras, then **sort ascending by `yearMonth`**.
 - `cashflow`: prefer the sheet's own `תזרים` total; if that cell is empty, fall back to `income − expenses`.
 - De-dupe: if two rows share a `yearMonth` (shouldn't happen across eras, but guard anyway), the later era wins.
@@ -216,13 +206,21 @@ Single page, RTL, Hebrew, green-forward. Sections top to bottom:
 2. **Cash-flow hero (Riseup signature)**
    Latest month's cash flow (income − expenses) as a prominent number: "נשאר החודש" style. Green if positive, red if negative.
 
-3. **Net worth over time** — line/area chart, full timeline, all eras stitched. Optional subtle era shading/markers.
+3. **Period gain/loss** — interactive card: **era dropdown** (**כל התקופות** / each era label from config; default **כל התקופות**) + period dropdown **3 / 6 / 12 חודשים / הכל** (default **6**). Headline = net-worth change over the trailing window within the selected era scope (`latest − startOfWindow`), signed + colored, with %. Sub-row: sum of cashflow, total income, total expenses in that window. If fewer months exist than requested, uses all available and notes it.
 
-4. **Income vs. Expenses over time** — two lines (green income, red expenses) on one chart.
+4. **Net worth over time** — line/area chart, all eras stitched. **No left (Y) axis** — values via tooltip only. **Era dropdown** + **timeframe dropdown** (card header): era options **כל התקופות** / each era; timeframe options **הכל** / **12 חודשים** / one option per calendar year present in the *era-scoped* data (newest first). Defaults: era **כל התקופות**, timeframe **הכל**. Year options recalculate when the era changes; an invalid year selection falls back to the chart default.
 
-5. **Cash flow over time** — bar or line chart, per month; positive/negative colored.
+5. **Asset allocation (pie)** — latest month with asset line items. Donut/pie of each type’s share of `netWorth` (₪ + %). Legend lists label, %, and value. Zero / empty types omitted. Config-driven labels from that month’s era `lineItems`. *(No era dropdown — already a single-month snapshot tied to one era.)*
 
-6. **Insight cards** — see §8.
+6. **Income vs. Expenses over time** — two lines (green income, red expenses). **No left (Y) axis** — values via tooltip only. Same per-chart era + timeframe dropdowns as §7.4; defaults: era **כל התקופות**, timeframe **12 חודשים**.
+
+7. **Expense breakdown (pie)** — period dropdown: each month present in the **current calendar year** (newest first), then **year summaries** — current year as `סיכום YYYY עד כה` (aggregate of months reported so far), then prior years `סיכום YYYY` (full calendar year of available data). Donut + legend of `expenseLineItems` shares of expenses total; zeros omitted; sorted largest-first. Default = newest current-year month (else newest year summary). *(No era dropdown — uses its own month/year period model.)*
+
+8. **Expense type history** — **era** + expense-type + timeframe dropdowns. Bar chart of that type’s monthly ₪ over the selected window. When an era is selected, the type list is that era’s `expenseLineItems` only; when **כל התקופות**, current-era types first then extras. Header shows **סה״כ** for the selected type × timeframe (sum of bars), plus **count of months with non-zero** and **first–last active month** labels within that window. Months that don’t include that type are skipped. Defaults: era **כל התקופות**, type = first current-era `expenseLineItems` entry, timeframe **12 חודשים**.
+
+9. **Cash flow over time** — bar chart, per month; positive/negative colored. Same per-chart era + timeframe dropdowns as §7.4; defaults: era **כל התקופות**, timeframe **12 חודשים**.
+
+10. **Insight cards** — see §8.
 
 ### 7.1 Design tokens (derived from the Riseup reference)
 
@@ -241,7 +239,7 @@ Mirror Riseup's **aesthetic**, not its out-of-scope features. In particular, **d
 | `card-bg` | `#FFFFFF` | Cards |
 | `page-bg` | `#F7F7F5` | Warm off-white page background |
 
-**Typography:** Rubik/Heebo. Hero numbers **very large** (~48–60px), bold, colored by sign, with the `₪` symbol. Section labels small, gray, above the value. Hebrew everywhere; thousands separators; sign shown for changes (`+15,407` green / `- 12,253`).
+**Typography:** Rubik/Heebo. Hero numbers **very large** (~48–60px), bold, colored by sign, with the `₪` symbol. Section labels small, gray, above the value. Hebrew everywhere; thousands separators; sign shown for changes (`+15,407` green / `−12,253`). Signs always sit on the **visual left** of digits (via LRM / custom formatters in `format.ts`) so RTL does not flip them to the trailing side.
 
 **Cards:** white, rounded corners ~`20px`, soft subtle shadow, generous padding, single-column mobile stack.
 
@@ -271,7 +269,7 @@ All computed from `MonthPoint[]`, nothing else:
 | Total saved over full period | `latest.netWorth − first.netWorth` |
 | Months tracked | count of `MonthPoint` |
 
-Keep these as small cards. No projections, no withdrawal rates.
+Keep these as small cards in a **2-column grid on all breakpoints** (including mobile). No projections, no withdrawal rates.
 
 ---
 
@@ -285,20 +283,35 @@ Keep these as small cards. No projections, no withdrawal rates.
     page.tsx                # dashboard (server component → client charts)
     layout.tsx              # dir="rtl", Rubik, base styles
   /components
+    ChartContainer.tsx      # measured width + viewport fallback; ChartErrorBoundary
+    ClientCharts.tsx        # client boundary for dynamic(..., { ssr: false })
+    ChartsSection.tsx       # client-only charts wrapper
+    TimeframeSelect.tsx     # per-chart timeframe dropdown (הכל / 12mo / years)
+    EraSelect.tsx           # per-chart era dropdown (כל התקופות / era labels)
     HeroCards.tsx           # HeroNetWorth + HeroCashflow
+    PeriodChangeCard.tsx    # made/lost over last N months (client, era + period select)
     NetWorthChart.tsx
+    AllocationPieCard.tsx   # shared donut + legend for allocation pies
+    AssetAllocationChart.tsx # pie: latest month asset types (% + ₪)
     IncomeExpensesChart.tsx
+    ExpenseBreakdownChart.tsx # pie: latest month expense types (% + ₪)
+    ExpenseTypeHistoryChart.tsx # bar: selected expense type over time
     CashflowChart.tsx
     InsightCards.tsx
     RefreshButton.tsx
   /lib
+    types.ts                # MonthPoint + BreakdownItem (shared; safe for client imports)
+    timeframe.ts            # filterByTimeframe (all / last12 / year) + options + resolveTimeframe
+    eraFilter.ts            # filterByEra (all / eraId) + options from eras.config
+    periodChange.ts         # trailing-window NW/cashflow totals for PeriodChangeCard
+    expensePeriod.ts        # expense-pie month/year period options + aggregation
     sheets.ts               # googleapis auth + batchGet
     normalize.ts            # eras.config → MonthPoint[]
     data.ts                 # unstable_cache (5 min) + finance-data tag
     columns.ts              # colToIndex helper
     dates.ts                # DD.MM.YYYY parse + yearMonth
     insights.ts             # the §8 calculations
-    format.ts               # ₪ / % / Hebrew month formatters
+    format.ts               # ₪ / % / Hebrew month formatters (leading +/- via LRM in RTL)
   eras.config.ts            # THE config (owner fills column letters)
 .env.local                  # secrets (gitignored)
 .env.local.example

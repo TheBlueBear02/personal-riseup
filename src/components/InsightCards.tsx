@@ -42,7 +42,7 @@ export function InsightCards({ insights }: Props) {
   return (
     <section>
       <h3 className="mb-3 text-base font-semibold text-text-primary">תובנות</h3>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3">
         <InsightCard
           label="שווי נקי נוכחי"
           value={formatIls(insights.currentNetWorth)}

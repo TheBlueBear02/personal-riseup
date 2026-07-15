@@ -8,16 +8,9 @@ import {
   isSheetsConfigured,
   type SheetValuesByTab,
 } from "@/lib/sheets";
+import type { BreakdownItem, MonthPoint } from "@/lib/types";
 
-export type MonthPoint = {
-  yearMonth: string;
-  date: string;
-  netWorth: number | null;
-  income: number | null;
-  expenses: number | null;
-  cashflow: number | null;
-  eraId: string;
-};
+export type { MonthPoint } from "@/lib/types";
 
 function cellNumber(row: unknown[], index: number): number {
   if (index < 0 || index >= row.length) return 0;
@@ -33,13 +26,19 @@ function cellRaw(row: unknown[], index: number): unknown {
   return row[index];
 }
 
-type AssetsRow = { yearMonth: string; date: string; netWorth: number };
+type AssetsRow = {
+  yearMonth: string;
+  date: string;
+  netWorth: number;
+  assets: BreakdownItem[];
+};
 type IncomeRow = {
   yearMonth: string;
   date: string;
   income: number;
   expenses: number;
   cashflow: number | null;
+  expenseBreakdown: BreakdownItem[];
 };
 
 function parseAssetsTab(
@@ -48,6 +47,10 @@ function parseAssetsTab(
 ): Map<string, AssetsRow> {
   const dateIdx = colToIndex(era.assets.dateCol);
   const totalIdx = colToIndex(era.assets.totalCol);
+  const lineItems = era.assets.lineItems.map((item) => ({
+    ...item,
+    index: colToIndex(item.col),
+  }));
   const map = new Map<string, AssetsRow>();
 
   for (const row of rows) {
@@ -57,6 +60,11 @@ function parseAssetsTab(
       yearMonth: parsed.yearMonth,
       date: parsed.date,
       netWorth: cellNumber(row, totalIdx),
+      assets: lineItems.map((item) => ({
+        id: item.id,
+        label: item.label,
+        value: cellNumber(row, item.index),
+      })),
     });
   }
   return map;
@@ -70,6 +78,10 @@ function parseIncomeExpensesTab(
   const incomeIdx = colToIndex(era.incomeExpenses.incomeTotalCol);
   const expensesIdx = colToIndex(era.incomeExpenses.expensesTotalCol);
   const cashflowIdx = colToIndex(era.incomeExpenses.cashflowTotalCol);
+  const expenseItems = era.incomeExpenses.expenseLineItems.map((item) => ({
+    ...item,
+    index: colToIndex(item.col),
+  }));
   const map = new Map<string, IncomeRow>();
 
   for (const row of rows) {
@@ -94,6 +106,11 @@ function parseIncomeExpensesTab(
       income,
       expenses,
       cashflow,
+      expenseBreakdown: expenseItems.map((item) => ({
+        id: item.id,
+        label: item.label,
+        value: cellNumber(row, item.index),
+      })),
     });
   }
   return map;
@@ -126,6 +143,8 @@ function mergeEra(
       expenses: expensesVal,
       cashflow,
       eraId,
+      assets: a?.assets ?? [],
+      expenseBreakdown: i?.expenseBreakdown ?? [],
     });
   }
 

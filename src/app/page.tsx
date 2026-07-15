@@ -1,8 +1,7 @@
 import { RefreshButton } from "@/components/RefreshButton";
 import { HeroCashflow, HeroNetWorth } from "@/components/HeroCards";
-import { NetWorthChart } from "@/components/NetWorthChart";
-import { IncomeExpensesChart } from "@/components/IncomeExpensesChart";
-import { CashflowChart } from "@/components/CashflowChart";
+import { ClientCharts } from "@/components/ClientCharts";
+import { PeriodChangeCard } from "@/components/PeriodChangeCard";
 import { InsightCards } from "@/components/InsightCards";
 import { getCachedTimeline } from "@/lib/data";
 import { computeInsights } from "@/lib/insights";
@@ -27,7 +26,7 @@ export default async function Home() {
 
   if (!result.ok) {
     return (
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-4 px-4 py-8 sm:max-w-2xl">
+      <main className="mx-auto flex w-full min-w-0 max-w-lg flex-1 flex-col gap-4 px-4 py-8 sm:max-w-2xl">
         <header className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-medium text-indigo">הכספים שלי</p>
@@ -44,7 +43,7 @@ export default async function Home() {
   const insights = computeInsights(timeline);
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-4 px-4 py-8 sm:max-w-2xl">
+    <main className="mx-auto flex w-full min-w-0 max-w-lg flex-1 flex-col gap-4 px-4 py-8 sm:max-w-2xl">
       <header className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-indigo">הכספים שלי</p>
@@ -55,9 +54,8 @@ export default async function Home() {
 
       <HeroCashflow insights={insights} />
       <HeroNetWorth insights={insights} />
-      <NetWorthChart data={timeline} />
-      <IncomeExpensesChart data={timeline} />
-      <CashflowChart data={timeline} />
+      <PeriodChangeCard data={timeline} />
+      <ClientCharts data={timeline} />
       <InsightCards insights={insights} />
 
       <footer className="pb-8 pt-2 text-center text-xs text-text-secondary">

@@ -1,6 +1,7 @@
 import {
   formatIls,
   formatIlsChange,
+  formatIlsForcedSign,
   formatPercent,
   hebrewMonthName,
   signColorClass,
@@ -33,15 +34,13 @@ export function HeroCashflow({ insights }: Props) {
         <div>
           <p className="text-xs text-text-secondary">סה״כ הכנסות</p>
           <p className="mt-1 text-lg font-semibold text-green">
-            {latest?.income != null ? `+${formatIls(latest.income).replace("₪", "").trim()} ₪` : "—"}
+            {formatIlsForcedSign(latest?.income, "+")}
           </p>
         </div>
         <div>
           <p className="text-xs text-text-secondary">סה״כ הוצאות</p>
           <p className="mt-1 text-lg font-semibold text-coral">
-            {latest?.expenses != null
-              ? `−${formatIls(latest.expenses).replace("₪", "").trim()} ₪`
-              : "—"}
+            {formatIlsForcedSign(latest?.expenses, "−")}
           </p>
         </div>
       </div>

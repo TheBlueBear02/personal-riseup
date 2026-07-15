@@ -1,4 +1,4 @@
-import type { MonthPoint } from "@/lib/normalize";
+import type { MonthPoint } from "@/lib/types";
 
 export type Insights = {
   currentNetWorth: number | null;

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Rubik } from "next/font/google";
 import "./globals.css";
 
@@ -11,6 +11,11 @@ const rubik = Rubik({
 export const metadata: Metadata = {
   title: "הכספים שלי",
   description: "מעקב שווי נקי ותזרים חודשי",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

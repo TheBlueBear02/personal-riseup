@@ -37,7 +37,9 @@ yarn-error.log*
 # Google service-account keys
 *-credentials.json
 *service-account*.json
+*-key.json
 credentials.json
+personal-riseup-key.json
 
 # vercel
 .vercel

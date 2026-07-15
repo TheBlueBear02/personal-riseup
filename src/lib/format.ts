@@ -1,37 +1,57 @@
-const ilsFormatter = new Intl.NumberFormat("he-IL", {
-  style: "currency",
-  currency: "ILS",
-  maximumFractionDigits: 0,
-});
-
 const numberFormatter = new Intl.NumberFormat("he-IL", {
   maximumFractionDigits: 0,
 });
 
-const pctFormatter = new Intl.NumberFormat("he-IL", {
-  style: "percent",
+const pctNumberFormatter = new Intl.NumberFormat("he-IL", {
   maximumFractionDigits: 1,
-  signDisplay: "exceptZero",
 });
 
-/** Format as ₪ with thousands separators, e.g. ₪25,981 */
-export function formatIls(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return ilsFormatter.format(value);
+/** LRM keeps +/- on the visual left of digits inside RTL layouts. */
+const LRM = "\u200E";
+const MINUS = "\u2212";
+
+function absNumber(value: number): string {
+  return numberFormatter.format(Math.abs(Math.round(value)));
 }
 
-/** Format change with explicit sign: +15,407 / −12,253 */
+/** Format as ₪ with thousands separators, e.g. 25,981 ₪; negatives as −25,981 ₪ */
+export function formatIls(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const abs = absNumber(value);
+  if (value < 0) return `${LRM}${MINUS}${abs} ₪`;
+  return `${abs} ₪`;
+}
+
+/** Format change with explicit sign on the left: +15,407 ₪ / −12,253 ₪ */
 export function formatIlsChange(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  const abs = numberFormatter.format(Math.abs(Math.round(value)));
-  if (value > 0) return `+${abs} ₪`;
-  if (value < 0) return `−${abs} ₪`;
+  const abs = absNumber(value);
+  if (value > 0) return `${LRM}+${abs} ₪`;
+  if (value < 0) return `${LRM}${MINUS}${abs} ₪`;
   return `0 ₪`;
+}
+
+/** Forced leading sign (income +, expenses −), always left of digits in RTL */
+export function formatIlsForcedSign(
+  value: number | null | undefined,
+  sign: "+" | "−",
+): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${LRM}${sign}${absNumber(value)} ₪`;
 }
 
 export function formatPercent(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  return pctFormatter.format(value);
+  const abs = pctNumberFormatter.format(Math.abs(value * 100));
+  if (value > 0) return `${LRM}+${abs}%`;
+  if (value < 0) return `${LRM}${MINUS}${abs}%`;
+  return `${abs}%`;
+}
+
+/** Unsigned share of total, e.g. 42.5% — for allocation pie labels. */
+export function formatSharePercent(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${pctNumberFormatter.format(value * 100)}%`;
 }
 
 /** Short month label for charts, e.g. מרץ 24 */
