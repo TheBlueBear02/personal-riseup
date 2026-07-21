@@ -32,3 +32,11 @@ body {
   color: var(--text-primary);
   font-family: var(--font-rubik), Arial, Helvetica, sans-serif;
 }
+
+button,
+[type="button"],
+[type="submit"],
+[type="reset"],
+[role="button"] {
+  cursor: pointer;
+}

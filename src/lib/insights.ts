@@ -14,6 +14,8 @@ export type Insights = {
   monthsTracked: number;
   latest: MonthPoint | null;
   previous: MonthPoint | null;
+  /** Index into timeline for `latest` (selected month). */
+  selectedIndex: number;
 };
 
 function mean(values: number[]): number | null {
@@ -21,13 +23,29 @@ function mean(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-export function computeInsights(timeline: MonthPoint[]): Insights {
+/**
+ * Insights for a point in the timeline.
+ * @param atIndex — month to treat as "current" (default: last).
+ */
+export function computeInsights(
+  timeline: MonthPoint[],
+  atIndex?: number,
+): Insights {
   const monthsTracked = timeline.length;
-  const latest = monthsTracked > 0 ? timeline[monthsTracked - 1] : null;
-  const previous = monthsTracked > 1 ? timeline[monthsTracked - 2] : null;
+  const selectedIndex =
+    monthsTracked === 0
+      ? -1
+      : Math.min(
+          Math.max(atIndex ?? monthsTracked - 1, 0),
+          monthsTracked - 1,
+        );
+  const latest = selectedIndex >= 0 ? timeline[selectedIndex] : null;
+  const previous = selectedIndex > 0 ? timeline[selectedIndex - 1] : null;
   const first = monthsTracked > 0 ? timeline[0] : null;
 
-  const last12 = timeline.slice(-12);
+  const windowStart = Math.max(0, selectedIndex - 11);
+  const last12 =
+    selectedIndex >= 0 ? timeline.slice(windowStart, selectedIndex + 1) : [];
 
   const cashflows12 = last12
     .map((p) => p.cashflow)
@@ -42,10 +60,7 @@ export function computeInsights(timeline: MonthPoint[]): Insights {
 
   let netWorthMomChange: number | null = null;
   let netWorthMomChangePct: number | null = null;
-  if (
-    latest?.netWorth != null &&
-    previous?.netWorth != null
-  ) {
+  if (latest?.netWorth != null && previous?.netWorth != null) {
     netWorthMomChange = latest.netWorth - previous.netWorth;
     if (previous.netWorth !== 0) {
       netWorthMomChangePct = netWorthMomChange / previous.netWorth;
@@ -92,5 +107,6 @@ export function computeInsights(timeline: MonthPoint[]): Insights {
     monthsTracked,
     latest,
     previous,
+    selectedIndex,
   };
 }

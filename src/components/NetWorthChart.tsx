@@ -9,16 +9,10 @@ import {
 } from "recharts";
 import { useState } from "react";
 import { ChartContainer, ChartErrorBoundary } from "@/components/ChartContainer";
-import { EraSelect } from "@/components/EraSelect";
 import { TimeframeSelect } from "@/components/TimeframeSelect";
 import type { MonthPoint } from "@/lib/types";
 import { formatIls, formatMonthLabel } from "@/lib/format";
-import {
-  DEFAULT_ERA,
-  eraOptions,
-  filterByEra,
-  type EraFilter,
-} from "@/lib/eraFilter";
+import { filterByEra, type EraFilter } from "@/lib/eraFilter";
 import {
   ALL_TIMEFRAME,
   filterByTimeframe,
@@ -29,12 +23,11 @@ import {
 
 type Props = {
   data: MonthPoint[];
+  era: EraFilter;
 };
 
-export function NetWorthChart({ data }: Props) {
-  const [era, setEra] = useState<EraFilter>(DEFAULT_ERA);
+export function NetWorthChart({ data, era }: Props) {
   const [timeframe, setTimeframe] = useState<Timeframe>(ALL_TIMEFRAME);
-  const eraOpts = eraOptions();
   const scoped = filterByEra(data, era);
   const options = timeframeOptions(scoped);
   const effectiveTimeframe = resolveTimeframe(timeframe, options, ALL_TIMEFRAME);
@@ -52,10 +45,13 @@ export function NetWorthChart({ data }: Props) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-text-primary">שווי נקי לאורך זמן</h3>
-          <p className="mt-1 text-sm text-text-secondary">כל התקופות מחוברות לטיימליין אחד</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            {era === "all"
+              ? "כל התקופות מחוברות לטיימליין אחד"
+              : "מסונן לפי תקופת החיים שנבחרה"}
+          </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <EraSelect value={era} options={eraOpts} onChange={setEra} />
           <TimeframeSelect
             value={effectiveTimeframe}
             options={options}

@@ -12,16 +12,10 @@ import {
 } from "recharts";
 import { useState } from "react";
 import { ChartContainer, ChartErrorBoundary } from "@/components/ChartContainer";
-import { EraSelect } from "@/components/EraSelect";
 import { TimeframeSelect } from "@/components/TimeframeSelect";
 import type { MonthPoint } from "@/lib/types";
 import { formatIls, formatMonthLabel } from "@/lib/format";
-import {
-  DEFAULT_ERA,
-  eraOptions,
-  filterByEra,
-  type EraFilter,
-} from "@/lib/eraFilter";
+import { filterByEra, type EraFilter } from "@/lib/eraFilter";
 import {
   DEFAULT_TIMEFRAME,
   filterByTimeframe,
@@ -32,12 +26,11 @@ import {
 
 type Props = {
   data: MonthPoint[];
+  era: EraFilter;
 };
 
-export function CashflowChart({ data }: Props) {
-  const [era, setEra] = useState<EraFilter>(DEFAULT_ERA);
+export function CashflowChart({ data, era }: Props) {
   const [timeframe, setTimeframe] = useState<Timeframe>(DEFAULT_TIMEFRAME);
-  const eraOpts = eraOptions();
   const scoped = filterByEra(data, era);
   const options = timeframeOptions(scoped);
   const effectiveTimeframe = resolveTimeframe(timeframe, options);
@@ -57,7 +50,6 @@ export function CashflowChart({ data }: Props) {
           <p className="mt-1 text-sm text-text-secondary">תזרים חודשי</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <EraSelect value={era} options={eraOpts} onChange={setEra} />
           <TimeframeSelect
             value={effectiveTimeframe}
             options={options}

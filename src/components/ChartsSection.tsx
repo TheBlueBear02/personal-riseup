@@ -7,21 +7,23 @@ import { ExpenseBreakdownChart } from "@/components/ExpenseBreakdownChart";
 import { ExpenseTypeHistoryChart } from "@/components/ExpenseTypeHistoryChart";
 import { CashflowChart } from "@/components/CashflowChart";
 import type { MonthPoint } from "@/lib/types";
+import type { EraFilter } from "@/lib/eraFilter";
 
 type Props = {
   data: MonthPoint[];
+  era: EraFilter;
 };
 
 /** Client-only charts bundle — loaded with ssr:false from the page. */
-export default function ChartsSection({ data }: Props) {
+export default function ChartsSection({ data, era }: Props) {
   return (
     <>
-      <NetWorthChart data={data} />
+      <NetWorthChart data={data} era={era} />
       <AssetAllocationChart data={data} />
-      <IncomeExpensesChart data={data} />
+      <IncomeExpensesChart data={data} era={era} />
       <ExpenseBreakdownChart data={data} />
-      <ExpenseTypeHistoryChart data={data} />
-      <CashflowChart data={data} />
+      <ExpenseTypeHistoryChart data={data} era={era} />
+      <CashflowChart data={data} era={era} />
     </>
   );
 }

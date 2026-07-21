@@ -1,7 +1,16 @@
+/**
+ * Expense categories from sheet row-2 banners under הוצאות.
+ * צרכים (+ דירה) → need; מותרות (+ מנויים) → luxury.
+ * Site-only overrides allowed (e.g. אוכל בחוץ → luxury); never write back to the sheet.
+ */
+export type ExpenseKind = "need" | "luxury";
+
 export type LineItem = {
   id: string;
   label: string;
   col: string;
+  /** Only used on expenseLineItems — drives needs vs luxuries split. */
+  kind?: ExpenseKind;
 };
 
 export type AssetsTableConfig = {
@@ -51,26 +60,28 @@ export const ERAS: Era[] = [
       incomeTotalCol: "I",
       expensesTotalCol: "AD",
       cashflowTotalCol: "AH",
+      // Sheet banners: צרכים K–Q · מותרות R–V · דירה W–AA · מנויים AB–AC
+      // Site override: אוכל בחוץ (M) → luxury (sheet still groups it under צרכים)
       expenseLineItems: [
-        { id: "food", label: "אוכל", col: "K" },
-        { id: "groceries_shared", label: "מצרכים", col: "L" },
-        { id: "eating_out", label: "אוכל בחוץ", col: "M" },
-        { id: "phone", label: "פלאפון", col: "N" },
-        { id: "transit", label: "תחבורה ציבורית", col: "O" },
-        { id: "studies", label: "לימודים", col: "P" },
-        { id: "nat_insurance", label: "ביטוח לאומי", col: "Q" },
-        { id: "spotify", label: "Spotify", col: "R" },
-        { id: "education", label: "השכלה", col: "S" },
-        { id: "shows", label: "הופעות", col: "T" },
-        { id: "projects", label: "פרוייקטים", col: "U" },
-        { id: "misc", label: "שונות", col: "V" },
-        { id: "rent", label: "שכירות", col: "W" },
-        { id: "electricity", label: "חשמל", col: "X" },
-        { id: "water", label: "מים", col: "Y" },
-        { id: "arnona", label: "ארנונה", col: "Z" },
-        { id: "internet", label: "אינטרנט", col: "AA" },
-        { id: "cursor", label: "Cursor", col: "AB" },
-        { id: "claude", label: "Claude", col: "AC" },
+        { id: "food", label: "אוכל", col: "K", kind: "need" },
+        { id: "groceries_shared", label: "מצרכים", col: "L", kind: "need" },
+        { id: "eating_out", label: "אוכל בחוץ", col: "M", kind: "luxury" },
+        { id: "phone", label: "פלאפון", col: "N", kind: "need" },
+        { id: "transit", label: "תחבורה ציבורית", col: "O", kind: "need" },
+        { id: "studies", label: "לימודים", col: "P", kind: "need" },
+        { id: "nat_insurance", label: "ביטוח לאומי", col: "Q", kind: "need" },
+        { id: "spotify", label: "Spotify", col: "R", kind: "luxury" },
+        { id: "education", label: "השכלה", col: "S", kind: "luxury" },
+        { id: "shows", label: "הופעות", col: "T", kind: "luxury" },
+        { id: "projects", label: "פרוייקטים", col: "U", kind: "luxury" },
+        { id: "misc", label: "שונות", col: "V", kind: "luxury" },
+        { id: "rent", label: "שכירות", col: "W", kind: "need" },
+        { id: "electricity", label: "חשמל", col: "X", kind: "need" },
+        { id: "water", label: "מים", col: "Y", kind: "need" },
+        { id: "arnona", label: "ארנונה", col: "Z", kind: "need" },
+        { id: "internet", label: "אינטרנט", col: "AA", kind: "need" },
+        { id: "cursor", label: "Cursor", col: "AB", kind: "luxury" },
+        { id: "claude", label: "Claude", col: "AC", kind: "luxury" },
       ],
     },
   },
@@ -95,13 +106,14 @@ export const ERAS: Era[] = [
       incomeTotalCol: "H",
       expensesTotalCol: "R",
       cashflowTotalCol: "V",
+      // Sheet banners: צרכים J · מותרות M–Q
       expenseLineItems: [
-        { id: "food", label: "אוכל", col: "J" },
-        { id: "phone", label: "פלאפון", col: "M" },
-        { id: "tv", label: "סלקום TV", col: "N" },
-        { id: "tickets", label: "כרטיסים למכבי חיפה", col: "O" },
-        { id: "education", label: "השכלה", col: "P" },
-        { id: "misc", label: "שונות", col: "Q" },
+        { id: "food", label: "אוכל", col: "J", kind: "need" },
+        { id: "phone", label: "פלאפון", col: "M", kind: "luxury" },
+        { id: "tv", label: "סלקום TV", col: "N", kind: "luxury" },
+        { id: "tickets", label: "כרטיסים למכבי חיפה", col: "O", kind: "luxury" },
+        { id: "education", label: "השכלה", col: "P", kind: "luxury" },
+        { id: "misc", label: "שונות", col: "Q", kind: "luxury" },
       ],
     },
   },

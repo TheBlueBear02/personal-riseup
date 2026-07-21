@@ -4,12 +4,13 @@ import {
   formatPercent,
 } from "@/lib/format";
 import type { Insights } from "@/lib/insights";
+import type { StreakInfo } from "@/lib/tierOne";
 
 type CardProps = {
   label: string;
   value: string;
   hint?: string;
-  tone?: "default" | "positive" | "negative";
+  tone?: "default" | "positive" | "negative" | "indigo";
 };
 
 function InsightCard({ label, value, hint, tone = "default" }: CardProps) {
@@ -18,7 +19,9 @@ function InsightCard({ label, value, hint, tone = "default" }: CardProps) {
       ? "text-green"
       : tone === "negative"
         ? "text-coral"
-        : "text-text-primary";
+        : tone === "indigo"
+          ? "text-indigo"
+          : "text-text-primary";
 
   return (
     <article className="rounded-[20px] bg-card p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
@@ -31,6 +34,7 @@ function InsightCard({ label, value, hint, tone = "default" }: CardProps) {
 
 type Props = {
   insights: Insights;
+  streaks: StreakInfo;
 };
 
 function toneOf(value: number | null): "default" | "positive" | "negative" {
@@ -38,7 +42,11 @@ function toneOf(value: number | null): "default" | "positive" | "negative" {
   return value > 0 ? "positive" : "negative";
 }
 
-export function InsightCards({ insights }: Props) {
+function streakValue(n: number): string {
+  return n > 0 ? String(n) : "—";
+}
+
+export function InsightCards({ insights, streaks }: Props) {
   return (
     <section>
       <h3 className="mb-3 text-base font-semibold text-text-primary">תובנות</h3>
@@ -76,6 +84,18 @@ export function InsightCards({ insights }: Props) {
           label="ממוצע שיעור חיסכון · 12 חודשים"
           value={formatPercent(insights.avgSavingsRate12)}
           tone={toneOf(insights.avgSavingsRate12)}
+        />
+        <InsightCard
+          label="רצף תזרים חיובי"
+          value={streakValue(streaks.positiveCashflow)}
+          hint="חודשים ברצף"
+          tone={streaks.positiveCashflow > 0 ? "positive" : "default"}
+        />
+        <InsightCard
+          label="רצף חיסכון מעל 20%"
+          value={streakValue(streaks.highSavings)}
+          hint="חודשים ברצף"
+          tone={streaks.highSavings > 0 ? "indigo" : "default"}
         />
         <InsightCard
           label="החודש הכי טוב"

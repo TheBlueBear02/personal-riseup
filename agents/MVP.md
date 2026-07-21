@@ -17,6 +17,14 @@ This document is the single source of truth for the build. It contains everythin
 - **Monthly cash flow** (the Riseup "hero" number: income − expenses)
 - **Income vs. expenses** over time
 - A small set of **insights** derived from those totals + latest allocation
+- **Tier‑1 extras** (all from existing monthly totals / config — no bank sync):
+  - Month navigator on heroes
+  - Savings rate as a one-line caption under the cashflow hero number (no separate card / sparkline)
+  - Expense categories above trailing average (anomaly cards)
+  - Year-over-year same-month compare
+  - Needs vs luxuries spend split (`kind` on expense line items; from sheet banners צרכים / מותרות)
+  - Positive-cashflow / high-savings streaks
+  - Top movers (expense + asset MoM deltas)
 
 **Design language:** Riseup-inspired — calm, green-forward, one big hero number, minimal chrome. Hebrew UI, right-to-left (RTL). Currency is **₪ (ILS) only**.
 
@@ -27,7 +35,7 @@ This document is the single source of truth for the build. It contains everythin
 - ❌ Budget / "expected to spend" bars
 - ❌ Multi-currency ($ / €) — those are derived columns; ignore them
 - ❌ Any writing back to the sheet — **read-only**
-- ❌ Auth / multi-user — single owner, see deployment note
+- ❌ Multi-user accounts — single owner; site uses a shared `SITE_PASSWORD` gate only (see §3)
 
 Totals timeline is still the core. Asset and expense **types** come from `eras.config` line-item lists, not from scanning sheet headers.
 
@@ -55,14 +63,14 @@ Because the totals (`סה"כ` / `סה"כ ברוטו`) exist in every era, the ti
 | Concern | Choice | Why |
 |---|---|---|
 | Framework | **Next.js (App Router) + TypeScript** | Server-side data fetch keeps the Google service-account key off the client; great Cursor support |
-| Styling | **Tailwind CSS** | Fast, RTL-friendly |
+| Styling | **Tailwind CSS** | Fast, RTL-friendly. Global `cursor: pointer` on `button` / button-like inputs in `globals.css` |
 | Charts | **Recharts** | Simple, declarative, good enough for line/area charts. **Must pin `react-is` to the same major as React** (via `dependencies` + `overrides`) — Recharts otherwise pulls `react-is@16`, and chart children render blank under React 19. Charts load via `ClientCharts` → `dynamic(..., { ssr: false })` (must be in a Client Component in Next 16), sized by `ChartContainer` (viewport fallback, never zero width, no focus outlines on `.recharts-wrapper` / `.recharts-surface`), and `isAnimationActive={false}` for mobile Safari |
 | Sheets access | **`googleapis`** (official Node client) | Service-account auth, `spreadsheets.values.get` |
 | Font | **Rubik** (or **Heebo**) via `next/font` | Rounded, Hebrew-first — closest free match to Riseup's typography |
 | Layout | **Mobile-first, responsive** | Riseup is a phone app; the reference screens are all portrait. Must look right on a phone and gracefully widen on desktop |
-| Deployment (MVP) | **localhost** (`next dev`) | Simplest + most private for financial data. Vercel + password is a documented future step, not MVP. **Phone on LAN:** run `npm run dev -- -H 0.0.0.0`, put your PC LAN IP in `next.config.ts` → `allowedDevOrigins` (otherwise SSR numbers load but chart JS is blocked) |
+| Deployment (MVP) | **localhost** (`next dev`) + **site password gate** | Gate at `/` (shared `SITE_PASSWORD`); dashboard at `/dashboard`. Middleware + httpOnly cookie protect pages and `/api/*`. Public **mockup** at `/mockup` (fake numbers, no Sheets) linked from the gate for demos. **Phone on LAN:** run `npm run dev -- -H 0.0.0.0`, put your PC LAN IP in `next.config.ts` → `allowedDevOrigins` (otherwise SSR numbers load but chart JS is blocked) |
 
-> **Security rule (non-negotiable):** the service-account JSON key is a server-only secret. It must never be imported into a client component or exposed in the browser bundle. All Google Sheets calls happen in server code (route handler or server component).
+> **Security rule (non-negotiable):** the service-account JSON key is a server-only secret. It must never be imported into a client component or exposed in the browser bundle. All Google Sheets calls happen in server code (route handler or server component). `SITE_PASSWORD` is likewise server-only — never read it in a Client Component. The site gate is **not** Google Sheets auth; Sheets still use the service account.
 
 ---
 
@@ -116,10 +124,14 @@ Create `eras.config.ts`. Each era declares, **per table**: the tab name, the dat
 
 ```ts
 // eras.config.ts
+export type ExpenseKind = "need" | "luxury";
+
 export type LineItem = {
   id: string;
   label: string; // Hebrew (or English) label shown in allocation pies
   col: string;
+  /** On expenseLineItems only — drives needs vs luxuries split UI. */
+  kind?: ExpenseKind;
 };
 
 export type AssetsTableConfig = {
@@ -135,7 +147,7 @@ export type IncomeExpensesTableConfig = {
   incomeTotalCol: string;    // income סה"כ
   expensesTotalCol: string;  // expenses סה"כ
   cashflowTotalCol: string;  // תזרים סה"כ
-  expenseLineItems: LineItem[]; // expense types — never include the expenses סה״כ column
+  expenseLineItems: LineItem[]; // expense types — never include the expenses סה״כ column; set kind
 };
 
 export type Era = {
@@ -200,25 +212,35 @@ colToIndex(letter) = sum over chars of (charCodeUpper - 64), in base 26, minus 1
 
 Single page, RTL, Hebrew, green-forward. Sections top to bottom:
 
-1. **Hero — current net worth**
-   Big number = latest month's net worth. Under it: month-over-month change (₪ and %), colored green/red.
+0. **Month navigator** — centered `‹ חודש שנה ›` (`MonthNavigator`, `dir="ltr"` so ‹ = older, › = newer). Owned by client `DashboardTop`; selected index drives heroes + all Tier‑1 cards below. Defaults to the newest month.
 
-2. **Cash-flow hero (Riseup signature)**
-   Latest month's cash flow (income − expenses) as a prominent number: "נשאר החודש" style. Green if positive, red if negative.
+1. **Combined hero (`HeroSummary`)** — one card, two halves (RTL):
+   - **Right half — cash flow (Riseup signature):** personalized greeting → bold month statement → selected month's cash flow (income − expenses) as a prominent number, green/red by sign → one-line savings caption replacing the old "נשאר בחודש זה" — e.g. **39.6% מהכנסה נחסך החודש** (`cashflow / income`, no sparkline) → bottom row with **סה״כ הכנסות** and **סה״כ הוצאות** flush side-by-side (`gap-0`).
+   - **Left half — net worth:** two titles matching right-side sizes — small **שווי נקי**, then semibold **שווי כלל הנכסים החודש** → big number → same bottom hairline as the right half → MoM change (₪ and %) below the line, aligned with the income/expenses row. Vertical hairline separates the halves.
 
-3. **Period gain/loss** — interactive card: **era dropdown** (**כל התקופות** / each era label from config; default **כל התקופות**) + period dropdown **3 / 6 / 12 חודשים / הכל** (default **6**). Headline = net-worth change over the trailing window within the selected era scope (`latest − startOfWindow`), signed + colored, with %. Sub-row: sum of cashflow, total income, total expenses in that window. If fewer months exist than requested, uses all available and notes it.
+2b. **YoY same-month compare** — last card in `DashboardTop` (above the era navigator). Selected month vs same `MM` one year earlier (lookup by `yearMonth`). Three-column layout: large month names as column headers; metric labels (תזרים / הכנסות / הוצאות / שווי נקי) centered with ₪ Δ and % change under each; amounts flanking each label. No footer summary line. Empty state if prior year missing.
 
-4. **Net worth over time** — line/area chart, all eras stitched. **No left (Y) axis** — values via tooltip only. **Era dropdown** + **timeframe dropdown** (card header): era options **כל התקופות** / each era; timeframe options **הכל** / **12 חודשים** / one option per calendar year present in the *era-scoped* data (newest first). Defaults: era **כל התקופות**, timeframe **הכל**. Year options recalculate when the era changes; an invalid year selection falls back to the chart default.
+2d. **מה השתנה החודש** — two-column card: expense MoM movers + above-average expense anomalies (up to 3 categories above trailing 6‑mo avg). Empty anomaly column when history is thin or all at/below average.
 
-5. **Asset allocation (pie)** — latest month with asset line items. Donut/pie of each type’s share of `netWorth` (₪ + %). Legend lists label, %, and value. Zero / empty types omitted. Config-driven labels from that month’s era `lineItems`. *(No era dropdown — already a single-month snapshot tied to one era.)*
+2e. **נכסים מול חודש קודם** — horizontal columns per asset: black outline icon by asset `id` (checking / brokerage / pension / money_market / child_savings + wallet fallback), name, this‑month ₪ value, MoM ₪ change. Scrolls horizontally when many types; shows all non‑zero assets for the selected month.
 
-6. **Income vs. Expenses over time** — two lines (green income, red expenses). **No left (Y) axis** — values via tooltip only. Same per-chart era + timeframe dropdowns as §7.4; defaults: era **כל התקופות**, timeframe **12 חודשים**.
+2f. **Needs vs luxuries (צרכים מול מותרות)** — bar + totals from `expenseLineItems[].kind` in `eras.config`, based on the sheet’s row‑2 banners under הוצאות (`need` indigo / `luxury` green), with site-only overrides allowed (sheet is never written). Current era: צרכים K–Q (except אוכל בחוץ) + דירה W–AA → `need`; מותרות R–V + אוכל בחוץ (M) + מנויים AB–AC → `luxury`. Army era: צרכים J → `need`; מותרות M–Q → `luxury`. Under the bar: **צרכים** on the right, **מותרות** flush on the visual left. Expand control reveals each expense line under its category (sorted largest-first; optional unclassified group). Unclassified kinds (if any) are a gray remainder on the bar.
 
-7. **Expense breakdown (pie)** — period dropdown: each month present in the **current calendar year** (newest first), then **year summaries** — current year as `סיכום YYYY עד כה` (aggregate of months reported so far), then prior years `סיכום YYYY` (full calendar year of available data). Donut + legend of `expenseLineItems` shares of expenses total; zeros omitted; sorted largest-first. Default = newest current-year month (else newest year summary). *(No era dropdown — uses its own month/year period model.)*
+2g. **Era navigator** — centered `‹ תקופת חיים ›` (`EraNavigator`, same chrome as month nav). Cycles **כל התקופות** / each era label from config (default **כל התקופות**). Owned by `DashboardClient`; scopes **period gain/loss** + every chart that used to have its own era dropdown (net worth, income vs expenses, expense-type history, cashflow). Asset allocation pie and expense breakdown pie stay **unscoped** (month/year models of their own). Per-card `EraSelect` dropdowns are removed.
 
-8. **Expense type history** — **era** + expense-type + timeframe dropdowns. Bar chart of that type’s monthly ₪ over the selected window. When an era is selected, the type list is that era’s `expenseLineItems` only; when **כל התקופות**, current-era types first then extras. Header shows **סה״כ** for the selected type × timeframe (sum of bars), plus **count of months with non-zero** and **first–last active month** labels within that window. Months that don’t include that type are skipped. Defaults: era **כל התקופות**, type = first current-era `expenseLineItems` entry, timeframe **12 חודשים**.
+3. **Period gain/loss** — interactive card: **period** dropdown only (**3 / 6 / 12 חודשים / הכל**, default **6**); era comes from §7.2g. Headline = net-worth change over the trailing window within the selected era scope (`latest − startOfWindow`), signed + colored, with %. Sub-row: sum of cashflow, total income, total expenses in that window. If fewer months exist than requested, uses all available and notes it.
 
-9. **Cash flow over time** — bar chart, per month; positive/negative colored. Same per-chart era + timeframe dropdowns as §7.4; defaults: era **כל התקופות**, timeframe **12 חודשים**.
+4. **Net worth over time** — line/area chart. **No left (Y) axis** — values via tooltip only. **Timeframe dropdown** only (era from §7.2g): **הכל** / **12 חודשים** / one option per calendar year in the era-scoped data (newest first). Default timeframe **הכל**. Year options recalculate when the global era changes; an invalid year selection falls back to the chart default.
+
+5. **Asset allocation (pie)** — latest month with asset line items. Donut/pie of each type’s share of `netWorth` (₪ + %). Legend lists label, %, and value. Zero / empty types omitted. Config-driven labels from that month’s era `lineItems`. *(Not scoped by global era navigator — single-month snapshot.)*
+
+6. **Income vs. Expenses over time** — two lines (green income, red expenses). **No left (Y) axis** — values via tooltip only. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**.
+
+7. **Expense breakdown (pie)** — period dropdown: each month present in the **current calendar year** (newest first), then **year summaries** — current year as `סיכום YYYY עד כה` (aggregate of months reported so far), then prior years `סיכום YYYY` (full calendar year of available data). Donut + legend of `expenseLineItems` shares of expenses total; zeros omitted; sorted largest-first. Default = newest current-year month (else newest year summary). *(Not scoped by global era navigator — own month/year period model.)*
+
+8. **Expense type history** — expense-type + timeframe dropdowns (era from §7.2g). Bar chart of that type’s monthly ₪ over the selected window. When an era is selected, the type list is that era’s `expenseLineItems` only; when **כל התקופות**, current-era types first then extras. Header shows **סה״כ** for the selected type × timeframe (sum of bars), plus **count of months with non-zero** and **first–last active month** labels within that window. Months that don’t include that type are skipped. Defaults: type = first current-era `expenseLineItems` entry, timeframe **12 חודשים**.
+
+9. **Cash flow over time** — bar chart, per month; positive/negative colored. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**.
 
 10. **Insight cards** — see §8.
 
@@ -243,33 +265,39 @@ Mirror Riseup's **aesthetic**, not its out-of-scope features. In particular, **d
 
 **Cards:** white, rounded corners ~`20px`, soft subtle shadow, generous padding, single-column mobile stack.
 
-**Hero cash-flow card (Riseup signature):** a short personalized line up top → a bold statement (e.g. "פברואר הסתיים בתזרים חיובי") → the giant colored number → a thin row beneath with two sub-stats side by side: **סה"כ הכנסות** (green `+`) and **סה"כ הוצאות** (`-`). This mirrors the reference exactly and uses only totals we have.
+**Combined hero card:** single white card split 50/50. Right (RTL start): cash-flow signature — personalized line → bold statement (e.g. "פברואר הסתיים בתזרים חיובי") → giant colored number → savings caption (**{pct}% מהכנסה נחסך החודש**, no sparkline) → flush income/expenses sub-stats (**סה"כ הכנסות** green `+`, **סה"כ הוצאות** `-`, no gap) under a hairline. Left: small **שווי נקי** + semibold **שווי כלל הנכסים החודש** (same sizes as right titles) → net worth big number → same hairline → MoM ₪/% change aligned with the income/expenses row. Vertical hairline between halves.
 
 **Month-comparison bar chart:** titled like "החודש ביחס לחודשים אחרים". Clean, **no gridlines**, value labels above each bar, month abbreviations below, green bars for positive cash flow and coral for negative, thin zero baseline. This is the cash-flow-over-time chart from §7.
 
-**Month navigator (optional, Riseup-flavored):** a centered `‹ חודש שנה ›` header with chevrons to move the "current" month the heroes describe. Nice-to-have; latest-month-as-hero is acceptable for MVP.
+**Month navigator (required):** see §7.0 — lives in `DashboardTop` with Tier‑1 cards. Chart section and bottom insight grid stay on the **newest** month / full timeline for insights (not tied to the month navigator). Era scoping for charts/period card is §7.2g.
 
-**RTL:** `dir="rtl"` on the root, right-aligned text, chart axes/legends oriented for Hebrew.
+**RTL:** `dir="rtl"` on the root, right-aligned text, chart axes/legends oriented for Hebrew. Month and era navigators force `dir="ltr"` for chevron order only.
 
 ---
 
 ## 8. Insights (totals-only — no FIRE)
 
+`computeInsights(timeline, atIndex?)` — `atIndex` defaults to last month. Heroes / Tier‑1 use the navigator index; the bottom insight grid uses the default (newest).
+
 All computed from `MonthPoint[]`, nothing else:
 
 | Insight | Formula |
 |---|---|
-| Current net worth | latest `netWorth` |
-| Net worth MoM change | `latest.netWorth − prev.netWorth` (₪ and %) |
-| Latest cash flow | `latest.cashflow` |
-| Avg monthly cash flow (last 12 mo) | mean of last 12 `cashflow` |
+| Current net worth | selected `netWorth` |
+| Net worth MoM change | `selected.netWorth − prev.netWorth` (₪ and %) |
+| Latest cash flow | selected `cashflow` |
+| Avg monthly cash flow (last 12 mo) | mean of up to 12 `cashflow` ending at selection |
 | Savings rate (latest) | `cashflow / income` as % (guard income = 0) |
-| Avg savings rate (last 12 mo) | mean of monthly `cashflow/income` |
-| Best / worst cash-flow month | max / min `cashflow` with its date |
-| Total saved over full period | `latest.netWorth − first.netWorth` |
+| Avg savings rate (last 12 mo) | mean of monthly `cashflow/income` in that window |
+| Best / worst cash-flow month | max / min `cashflow` over **full** timeline with its date |
+| Total saved over full period | `selected.netWorth − first.netWorth` |
 | Months tracked | count of `MonthPoint` |
+| Positive cashflow streak | consecutive months ending at newest with `cashflow > 0` |
+| High-savings streak | consecutive months ending at newest with savings rate ≥ 20% |
 
-Keep these as small cards in a **2-column grid on all breakpoints** (including mobile). No projections, no withdrawal rates.
+**Tier‑1 helpers** live in `src/lib/tierOne.ts` (anomalies, YoY, streaks, movers, needs/luxuries, savings-rate series).
+
+Keep the bottom insight cards as a **2-column grid on all breakpoints** (including mobile). No projections, no withdrawal rates.
 
 ---
 
@@ -278,18 +306,27 @@ Keep these as small cards in a **2-column grid on all breakpoints** (including m
 ```
 /src
   /app
-    /api/data/route.ts      # server: returns normalized MonthPoint[] as JSON
-    actions.ts              # refreshFinanceData server action (revalidateTag)
-    page.tsx                # dashboard (server component → client charts)
+    /api/data/route.ts      # server: returns normalized MonthPoint[] as JSON (middleware-gated)
+    actions.ts              # refreshFinanceData + loginWithPassword + logout server actions
+    page.tsx                # site password gate (homepage) + link to mockup
+    /dashboard/page.tsx     # finance dashboard (server component → client charts)
+    /mockup/page.tsx        # public demo dashboard with random numbers (no Sheets)
     layout.tsx              # dir="rtl", Rubik, base styles
+  middleware.ts             # cookie gate: protect /dashboard + /api/*; redirect unlocked / → /dashboard (/mockup is open)
   /components
     ChartContainer.tsx      # measured width + viewport fallback; ChartErrorBoundary
     ClientCharts.tsx        # client boundary for dynamic(..., { ssr: false })
     ChartsSection.tsx       # client-only charts wrapper
     TimeframeSelect.tsx     # per-chart timeframe dropdown (הכל / 12mo / years)
-    EraSelect.tsx           # per-chart era dropdown (כל התקופות / era labels)
-    HeroCards.tsx           # HeroNetWorth + HeroCashflow
-    PeriodChangeCard.tsx    # made/lost over last N months (client, era + period select)
+    DashboardClient.tsx     # client: global era + DashboardTop + period + charts + insights
+    DashboardTop.tsx        # client: month index + heroes + Tier‑1 cards
+    MonthNavigator.tsx      # ‹ month › chevrons (ltr order)
+    EraNavigator.tsx        # ‹ era › chevrons — scopes period card + era-aware charts
+    HeroCards.tsx           # HeroSummary (cashflow + net worth + inline savings %)
+    YoYCompareCard.tsx      # same-month last year
+    TopMoversCard.tsx       # מה השתנה: expense movers + anomalies; AssetsMoversCard
+    NeedsLuxuriesCard.tsx   # needs vs luxuries spend bar
+    PeriodChangeCard.tsx    # made/lost over last N months (client; era from prop)
     NetWorthChart.tsx
     AllocationPieCard.tsx   # shared donut + legend for allocation pies
     AssetAllocationChart.tsx # pie: latest month asset types (% + ₪)
@@ -297,10 +334,14 @@ Keep these as small cards in a **2-column grid on all breakpoints** (including m
     ExpenseBreakdownChart.tsx # pie: latest month expense types (% + ₪)
     ExpenseTypeHistoryChart.tsx # bar: selected expense type over time
     CashflowChart.tsx
-    InsightCards.tsx
+    InsightCards.tsx        # §8 insight grid (includes streaks)
     RefreshButton.tsx
+    DisconnectButton.tsx    # form → logout (clears site_access cookie → /)
+    PasswordGateForm.tsx    # client form → loginWithPassword
   /lib
     types.ts                # MonthPoint + BreakdownItem (shared; safe for client imports)
+    auth.ts                 # HMAC access token + timing-safe password check (site gate)
+    mockTimeline.ts         # seeded fake MonthPoint[] for /mockup demos
     timeframe.ts            # filterByTimeframe (all / last12 / year) + options + resolveTimeframe
     eraFilter.ts            # filterByEra (all / eraId) + options from eras.config
     periodChange.ts         # trailing-window NW/cashflow totals for PeriodChangeCard
@@ -310,9 +351,10 @@ Keep these as small cards in a **2-column grid on all breakpoints** (including m
     data.ts                 # unstable_cache (5 min) + finance-data tag
     columns.ts              # colToIndex helper
     dates.ts                # DD.MM.YYYY parse + yearMonth
-    insights.ts             # the §8 calculations
+    insights.ts             # the §8 calculations (optional atIndex)
+    tierOne.ts              # anomalies, YoY, streaks, movers, needs/luxuries, rate series
     format.ts               # ₪ / % / Hebrew month formatters (leading +/- via LRM in RTL)
-  eras.config.ts            # THE config (owner fills column letters)
+  eras.config.ts            # THE config (owner fills column letters + expense kind)
 .env.local                  # secrets (gitignored)
 .env.local.example
 .gitignore
@@ -327,9 +369,12 @@ Keep these as small cards in a **2-column grid on all breakpoints** (including m
 ```
 GOOGLE_SPREADSHEET_ID=<the long id from the sheet URL, between /d/ and /edit>
 GOOGLE_SERVICE_ACCOUNT_KEY=<the full service-account JSON, as a single-line string>
+SITE_PASSWORD=<shared password for the homepage gate>
 ```
 
 - Load the JSON from the env var and pass it to `google.auth.GoogleAuth({ credentials, scopes: [...] })`.
+- `SITE_PASSWORD` unlocks `/` → sets httpOnly `site_access` cookie (HMAC of the password); middleware verifies it before `/dashboard` and `/api/*`. Dashboard **התנתקות** clears the cookie and returns to `/`.
+- **Mockup / demo:** `/mockup` is **not** password-gated. The gate page links to it. `buildMockTimeline()` invents ~36 months across both eras using `eras.config` labels; numbers reshuffle on each page load. Real sheet data is never loaded on this route — safe for showing the UI to others.
 - Ensure `.env.local` and any `*.json` key file are in `.gitignore`.
 - (Future, for Vercel: store the key base64-encoded in a project env var and decode server-side.)
 
@@ -364,7 +409,7 @@ For each `TODO` in §5: open the relevant tab, click the exact total/date cell, 
 **G. Get the spreadsheet ID**
 From the sheet URL: `https://docs.google.com/spreadsheets/d/`**`THIS_PART`**`/edit`. Put it in `.env.local`.
 
-**H. Fill `.env.local`** with the ID and the JSON key (§10), then run `npm run dev`.
+**H. Fill `.env.local`** with the ID, the JSON key, and `SITE_PASSWORD` (§10), then run `npm run dev`. Visit `/`, enter the password, and you should land on `/dashboard`.
 
 ---
 
@@ -387,8 +432,9 @@ Feed these to the agent roughly in sequence:
 - [x] ~~Riseup reference screenshots~~ — received; design tokens captured in §7.1.
 - [x] ~~App scaffold & dashboard~~ — implemented under `src/` (see §9). Runs on localhost with a setup banner until credentials + column letters are filled.
 - [ ] **Column letters** for all four tabs (§11 step F) — the only thing blocking a working data layer.
-- [ ] **Env vars** — `GOOGLE_SPREADSHEET_ID` + `GOOGLE_SERVICE_ACCOUNT_KEY` in `.env.local` (§11 A–E, G–H).
-- [ ] **Deployment choice** — confirm localhost for MVP, or decide on Vercel + a password now (adds a small auth step).
+- [ ] **Env vars** — `GOOGLE_SPREADSHEET_ID` + `GOOGLE_SERVICE_ACCOUNT_KEY` + `SITE_PASSWORD` in `.env.local` (§11 A–E, G–H).
+- [x] ~~**Site password gate**~~ — `/` gate + `/dashboard` + middleware cookie protection (set `SITE_PASSWORD`).
+- [x] ~~**Mockup dashboard**~~ — `/mockup` with random numbers + gate-page link (no Sheets / no real money data).
 
 ---
 

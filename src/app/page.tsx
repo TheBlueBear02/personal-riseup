@@ -1,66 +1,31 @@
-import { RefreshButton } from "@/components/RefreshButton";
-import { HeroCashflow, HeroNetWorth } from "@/components/HeroCards";
-import { ClientCharts } from "@/components/ClientCharts";
-import { PeriodChangeCard } from "@/components/PeriodChangeCard";
-import { InsightCards } from "@/components/InsightCards";
-import { getCachedTimeline } from "@/lib/data";
-import { computeInsights } from "@/lib/insights";
+import Link from "next/link";
+import { PasswordGateForm } from "@/components/PasswordGateForm";
 
-function SetupBanner({ message }: { message: string }) {
+export default function GatePage() {
   return (
-    <div className="rounded-[20px] border border-yellow/40 bg-yellow/15 p-5 text-sm leading-relaxed text-text-primary">
-      <p className="font-semibold">האפליקציה מוכנה — נשאר להשלים הגדרה</p>
-      <p className="mt-2 text-text-secondary">{message}</p>
-      <ol className="mt-3 list-decimal space-y-1 pr-5 text-text-secondary">
-        <li>צרו Service Account ושתפו איתו את הגיליון (Viewer)</li>
-        <li>מלאו `.env.local` לפי `.env.local.example`</li>
-        <li>מלאו את אותיות העמודות ב־`src/eras.config.ts` (Name Box בגיליון)</li>
-        <li>הריצו מחדש `npm run dev`</li>
-      </ol>
-    </div>
-  );
-}
-
-export default async function Home() {
-  const result = await getCachedTimeline();
-
-  if (!result.ok) {
-    return (
-      <main className="mx-auto flex w-full min-w-0 max-w-lg flex-1 flex-col gap-4 px-4 py-8 sm:max-w-2xl">
-        <header className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium text-indigo">הכספים שלי</p>
-            <h1 className="text-2xl font-bold text-text-primary">לוח בקרה</h1>
-          </div>
-          <RefreshButton />
-        </header>
-        <SetupBanner message={result.message} />
-      </main>
-    );
-  }
-
-  const timeline = result.data;
-  const insights = computeInsights(timeline);
-
-  return (
-    <main className="mx-auto flex w-full min-w-0 max-w-lg flex-1 flex-col gap-4 px-4 py-8 sm:max-w-2xl">
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium text-indigo">הכספים שלי</p>
-          <h1 className="text-2xl font-bold text-text-primary">לוח בקרה</h1>
-        </div>
-        <RefreshButton />
-      </header>
-
-      <HeroCashflow insights={insights} />
-      <HeroNetWorth insights={insights} />
-      <PeriodChangeCard data={timeline} />
-      <ClientCharts data={timeline} />
-      <InsightCards insights={insights} />
-
-      <footer className="pb-8 pt-2 text-center text-xs text-text-secondary">
-        נתונים מקובץ Google Sheets · קריאה בלבד
-      </footer>
+    <main className="mx-auto flex w-full min-w-0 max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-16">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold tracking-tight text-text-primary">
+          הכספים שלי
+        </h1>
+        <p className="mt-2 text-sm text-text-secondary">כניסה עם סיסמה</p>
+      </div>
+      <PasswordGateForm />
+      <div className="relative text-center">
+        <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-black/8" />
+        <span className="relative bg-page px-3 text-xs text-text-secondary">
+          או
+        </span>
+      </div>
+      <Link
+        href="/mockup"
+        className="rounded-[16px] border border-black/8 bg-card px-4 py-3 text-center text-base font-medium text-text-primary transition hover:border-green/40 hover:bg-green/5"
+      >
+        תצוגת דמו
+        <span className="mt-1 block text-sm font-normal text-text-secondary">
+          לוח בקרה עם מספרים אקראיים
+        </span>
+      </Link>
     </main>
   );
 }

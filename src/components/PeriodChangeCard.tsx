@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { EraSelect } from "@/components/EraSelect";
 import {
   formatIls,
   formatIlsChange,
@@ -9,12 +8,7 @@ import {
   signColorClass,
 } from "@/lib/format";
 import type { MonthPoint } from "@/lib/types";
-import {
-  DEFAULT_ERA,
-  eraOptions,
-  filterByEra,
-  type EraFilter,
-} from "@/lib/eraFilter";
+import { filterByEra, type EraFilter } from "@/lib/eraFilter";
 import {
   DEFAULT_PERIOD,
   PERIOD_OPTIONS,
@@ -24,6 +18,8 @@ import {
 
 type Props = {
   data: MonthPoint[];
+  /** Global era from EraNavigator. */
+  era: EraFilter;
 };
 
 function PeriodSelect({
@@ -62,10 +58,8 @@ function PeriodSelect({
   );
 }
 
-export function PeriodChangeCard({ data }: Props) {
-  const [era, setEra] = useState<EraFilter>(DEFAULT_ERA);
+export function PeriodChangeCard({ data, era }: Props) {
   const [period, setPeriod] = useState<number | "all">(DEFAULT_PERIOD);
-  const eraOpts = eraOptions();
   const scoped = filterByEra(data, era);
   const result = computePeriodChange(scoped, period);
 
@@ -93,7 +87,6 @@ export function PeriodChangeCard({ data }: Props) {
           <p className="mt-1 text-sm text-text-secondary">{periodHint}</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <EraSelect value={era} options={eraOpts} onChange={setEra} />
           <PeriodSelect value={period} options={PERIOD_OPTIONS} onChange={setPeriod} />
         </div>
       </div>

@@ -77,6 +77,21 @@ export function formatMonthLabel(yearMonth: string): string {
   return `${HEBREW_MONTHS[month - 1]} ${shortYear}`;
 }
 
+const HEBREW_MONTH_FULL = [
+  "ינואר",
+  "פברואר",
+  "מרץ",
+  "אפריל",
+  "מאי",
+  "יוני",
+  "יולי",
+  "אוגוסט",
+  "ספטמבר",
+  "אוקטובר",
+  "נובמבר",
+  "דצמבר",
+];
+
 /** Hebrew month name from DD.MM.YYYY or yearMonth */
 export function hebrewMonthName(dateOrYearMonth: string): string {
   let month: number | undefined;
@@ -87,21 +102,14 @@ export function hebrewMonthName(dateOrYearMonth: string): string {
     month = Number(dateOrYearMonth.split("-")[1]);
   }
   if (!month || month < 1 || month > 12) return dateOrYearMonth;
-  const names = [
-    "ינואר",
-    "פברואר",
-    "מרץ",
-    "אפריל",
-    "מאי",
-    "יוני",
-    "יולי",
-    "אוגוסט",
-    "ספטמבר",
-    "אוקטובר",
-    "נובמבר",
-    "דצמבר",
-  ];
-  return names[month - 1];
+  return HEBREW_MONTH_FULL[month - 1];
+}
+
+/** Full month + year for navigators, e.g. מרץ 2026 */
+export function hebrewMonthYear(yearMonth: string): string {
+  const [year, month] = yearMonth.split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) return yearMonth;
+  return `${HEBREW_MONTH_FULL[month - 1]} ${year}`;
 }
 
 export function signColorClass(value: number | null | undefined): string {

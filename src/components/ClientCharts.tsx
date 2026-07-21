@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { MonthPoint } from "@/lib/types";
+import type { EraFilter } from "@/lib/eraFilter";
 
 const ChartsSection = dynamic(() => import("@/components/ChartsSection"), {
   ssr: false,
@@ -19,9 +20,10 @@ const ChartsSection = dynamic(() => import("@/components/ChartsSection"), {
 
 type Props = {
   data: MonthPoint[];
+  era: EraFilter;
 };
 
 /** Client boundary so `dynamic(..., { ssr: false })` is legal in Next.js 16. */
-export function ClientCharts({ data }: Props) {
-  return <ChartsSection data={data} />;
+export function ClientCharts({ data, era }: Props) {
+  return <ChartsSection data={data} era={era} />;
 }

@@ -11,17 +11,11 @@ import {
 } from "recharts";
 import { useState } from "react";
 import { ChartContainer, ChartErrorBoundary } from "@/components/ChartContainer";
-import { EraSelect } from "@/components/EraSelect";
 import { TimeframeSelect } from "@/components/TimeframeSelect";
 import { ERAS } from "@/eras.config";
 import type { MonthPoint } from "@/lib/types";
 import { formatIls, formatMonthLabel } from "@/lib/format";
-import {
-  DEFAULT_ERA,
-  eraOptions,
-  filterByEra,
-  type EraFilter,
-} from "@/lib/eraFilter";
+import { filterByEra, type EraFilter } from "@/lib/eraFilter";
 import {
   DEFAULT_TIMEFRAME,
   filterByTimeframe,
@@ -99,16 +93,15 @@ function TypeSelect({
 
 type Props = {
   data: MonthPoint[];
+  era: EraFilter;
 };
 
-export function ExpenseTypeHistoryChart({ data }: Props) {
-  const [era, setEra] = useState<EraFilter>(DEFAULT_ERA);
+export function ExpenseTypeHistoryChart({ data, era }: Props) {
   const [typeId, setTypeId] = useState(
-    () => expenseTypeOptions(DEFAULT_ERA)[0]?.id ?? "",
+    () => expenseTypeOptions("all")[0]?.id ?? "",
   );
   const [timeframe, setTimeframe] = useState<Timeframe>(DEFAULT_TIMEFRAME);
 
-  const eraOpts = eraOptions();
   const typeOptions = expenseTypeOptions(era);
   const effectiveTypeId = typeOptions.some((o) => o.id === typeId)
     ? typeId
@@ -163,7 +156,6 @@ export function ExpenseTypeHistoryChart({ data }: Props) {
           )}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <EraSelect value={era} options={eraOpts} onChange={setEra} />
           {typeOptions.length > 0 && (
             <TypeSelect
               value={effectiveTypeId}
