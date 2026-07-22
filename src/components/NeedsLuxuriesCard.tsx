@@ -1,15 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useMemo, useState } from "react";
+import { buildAllocationSlices } from "@/components/AllocationPieCard";
 import { formatIls, formatSharePercent } from "@/lib/format";
-import type { BreakdownItem } from "@/lib/types";
+import type { BreakdownItem, MonthPoint } from "@/lib/types";
 import type { NeedsLuxuriesSplit } from "@/lib/tierOne";
+
+const ExpenseBreakdownChart = dynamic(
+  () =>
+    import("@/components/ExpenseBreakdownChart").then(
+      (m) => m.ExpenseBreakdownChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-5 h-[200px] animate-pulse rounded-xl bg-page" />
+    ),
+  },
+);
 
 type Props = {
   split: NeedsLuxuriesSplit;
+  data: MonthPoint[];
+  yearMonth: string;
 };
 
-function ExpenseList({ items }: { items: BreakdownItem[] }) {
+function ExpenseList({
+  items,
+  total,
+  colorsById,
+}: {
+  items: BreakdownItem[];
+  total: number;
+  colorsById: Map<string, string>;
+}) {
   if (items.length === 0) {
     return (
       <p className="mt-2 text-xs text-text-secondary">אין פריטים בקטגוריה זו</p>
@@ -18,24 +43,57 @@ function ExpenseList({ items }: { items: BreakdownItem[] }) {
 
   return (
     <ul className="mt-2 space-y-1.5">
-      {items.map((item) => (
-        <li
-          key={item.id}
-          className="flex items-center justify-between gap-2 text-sm"
-        >
-          <span className="truncate text-text-primary">{item.label}</span>
-          <span className="shrink-0 font-semibold text-text-primary">
-            {formatIls(item.value)}
-          </span>
-        </li>
-      ))}
+      {items.map((item) => {
+        const share = total > 0 ? item.value / total : null;
+        const color = colorsById.get(item.id);
+        return (
+          <li
+            key={item.id}
+            className="flex items-center justify-between gap-2 text-sm"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              {color && (
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: color }}
+                  aria-hidden
+                />
+              )}
+              <span className="truncate text-text-primary">{item.label}</span>
+            </span>
+            <span className="shrink-0 tabular-nums text-text-secondary">
+              <span
+                className="font-semibold"
+                style={color ? { color } : undefined}
+              >
+                {formatSharePercent(share)}
+              </span>
+              {" · "}
+              <span className="font-semibold text-text-primary">
+                {formatIls(item.value)}
+              </span>
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-export function NeedsLuxuriesCard({ split }: Props) {
+export function NeedsLuxuriesCard({ split, data, yearMonth }: Props) {
   const [expanded, setExpanded] = useState(false);
   const total = split.needs + split.luxuries + split.unclassified;
+
+  const colorsById = useMemo(() => {
+    const allItems = [
+      ...split.needsItems,
+      ...split.luxuriesItems,
+      ...split.unclassifiedItems,
+    ];
+    const slices = buildAllocationSlices(allItems, total);
+    return new Map(slices.map((s) => [s.id, s.color]));
+  }, [split, total]);
+
   if (total <= 0) {
     return (
       <section className="rounded-[20px] bg-card p-6 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
@@ -109,6 +167,14 @@ export function NeedsLuxuriesCard({ split }: Props) {
         </div>
       </div>
 
+      {yearMonth ? (
+        <ExpenseBreakdownChart
+          data={data}
+          yearMonth={yearMonth}
+          embedded
+        />
+      ) : null}
+
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -134,7 +200,11 @@ export function NeedsLuxuriesCard({ split }: Props) {
                 {formatIls(split.needs)}
               </p>
             </div>
-            <ExpenseList items={split.needsItems} />
+            <ExpenseList
+              items={split.needsItems}
+              total={total}
+              colorsById={colorsById}
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -144,7 +214,11 @@ export function NeedsLuxuriesCard({ split }: Props) {
                 {formatIls(split.luxuries)}
               </p>
             </div>
-            <ExpenseList items={split.luxuriesItems} />
+            <ExpenseList
+              items={split.luxuriesItems}
+              total={total}
+              colorsById={colorsById}
+            />
           </div>
           {split.unclassifiedItems.length > 0 && (
             <div>
@@ -155,7 +229,11 @@ export function NeedsLuxuriesCard({ split }: Props) {
                   {formatIls(split.unclassified)}
                 </p>
               </div>
-              <ExpenseList items={split.unclassifiedItems} />
+              <ExpenseList
+                items={split.unclassifiedItems}
+                total={total}
+                colorsById={colorsById}
+              />
             </div>
           )}
         </div>

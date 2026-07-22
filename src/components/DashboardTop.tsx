@@ -22,6 +22,7 @@ type Props = {
   data: MonthPoint[];
 };
 
+/** Month navigator + heroes + month-summary cards (expenses / assets / YoY). */
 export function DashboardTop({ data }: Props) {
   const [index, setIndex] = useState(() =>
     data.length > 0 ? data.length - 1 : 0,
@@ -35,27 +36,35 @@ export function DashboardTop({ data }: Props) {
   const movers = computeTopMovers(data, safeIndex);
   const needsLuxuries = computeNeedsLuxuries(insights.latest);
 
-  const label =
-    insights.latest?.yearMonth != null
-      ? insights.latest.yearMonth
-      : "";
+  const yearMonth = insights.latest?.yearMonth ?? "";
 
   return (
     <>
       <MonthNavigator
-        label={label}
+        label={yearMonth}
         canPrev={safeIndex > 0}
         canNext={safeIndex < data.length - 1}
         onPrev={() => setIndex((i) => Math.max(0, i - 1))}
         onNext={() => setIndex((i) => Math.min(data.length - 1, i + 1))}
       />
       <HeroSummary insights={insights} />
+
+      {/* Expenses block */}
       <TopMoversCard movers={movers} anomalies={anomalies} />
+      <NeedsLuxuriesCard
+        split={needsLuxuries}
+        data={data}
+        yearMonth={yearMonth}
+      />
+
+      {/* Assets block */}
       <AssetsMoversCard
         current={insights.latest}
         previous={safeIndex > 0 ? data[safeIndex - 1] : null}
+        data={data}
+        yearMonth={yearMonth}
       />
-      <NeedsLuxuriesCard split={needsLuxuries} />
+
       <YoYCompareCard yoy={yoy} current={insights.latest} />
     </>
   );

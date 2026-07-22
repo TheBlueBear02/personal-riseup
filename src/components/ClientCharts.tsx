@@ -8,7 +8,7 @@ const ChartsSection = dynamic(() => import("@/components/ChartsSection"), {
   ssr: false,
   loading: () => (
     <div className="flex flex-col gap-4">
-      {[0, 1, 2, 3, 4, 5].map((i) => (
+      {[0, 1, 2, 3].map((i) => (
         <div
           key={i}
           className="h-80 animate-pulse rounded-[20px] bg-card shadow-[0_2px_12px_rgba(0,0,0,0.06)]"

@@ -6,7 +6,7 @@ import { ChartContainer, ChartErrorBoundary } from "@/components/ChartContainer"
 import type { BreakdownItem } from "@/lib/types";
 import { formatIls, formatSharePercent } from "@/lib/format";
 
-const SLICE_COLORS = [
+export const ALLOCATION_COLORS = [
   "#2FBE6E",
   "#3D6BCC",
   "#EE7E6E",
@@ -19,7 +19,9 @@ const SLICE_COLORS = [
   "#D4A017",
   "#5C7A99",
   "#B85C5C",
-];
+] as const;
+
+const SLICE_COLORS = ALLOCATION_COLORS;
 
 type SliceRow = BreakdownItem & {
   color: string;
@@ -55,6 +57,17 @@ type Props = {
   slices: SliceRow[];
   /** Optional control in the card header (e.g. period select). */
   headerRight?: ReactNode;
+  /** Hide the color legend list under the pie (detail lives elsewhere). */
+  showLegend?: boolean;
+  /** Hide the total footer under the pie. */
+  showTotal?: boolean;
+  /**
+   * Render pie content without the outer card chrome — for nesting inside
+   * another section (e.g. needs/luxuries).
+   */
+  embedded?: boolean;
+  /** Chart height when embedded (default 220 standalone / 200 embedded). */
+  chartHeight?: number;
 };
 
 export function AllocationPieCard({
@@ -66,63 +79,63 @@ export function AllocationPieCard({
   total,
   slices,
   headerRight,
+  showLegend = true,
+  showTotal = true,
+  embedded = false,
+  chartHeight,
 }: Props) {
-  return (
-    <section className="rounded-[20px] bg-card p-6 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-base font-semibold text-text-primary">{title}</h3>
-          <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
-        </div>
-        {headerRight}
-      </div>
+  const height = chartHeight ?? (embedded ? 200 : 220);
 
-      {slices.length === 0 ? (
-        <p className="mt-4 text-sm text-text-secondary">{emptyMessage}</p>
-      ) : (
-        <ChartErrorBoundary label={chartLabel}>
-          <div>
-            <ChartContainer height={220}>
-              {({ width, height }) => {
-                const size = Math.min(width, height);
-                return (
-                  <PieChart width={width} height={height}>
-                    <Pie
-                      data={slices}
-                      dataKey="value"
-                      nameKey="label"
-                      cx={width / 2}
-                      cy={height / 2}
-                      innerRadius={size * 0.28}
-                      outerRadius={size * 0.42}
-                      paddingAngle={2}
-                      stroke="none"
-                      isAnimationActive={false}
-                    >
-                      {slices.map((slice) => (
-                        <Cell key={slice.id} fill={slice.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value, _name, item) => {
-                        const share = (item?.payload as SliceRow | undefined)?.share;
-                        return [
-                          `${formatIls(Number(value))} · ${formatSharePercent(share)}`,
-                          (item?.payload as SliceRow | undefined)?.label ?? "",
-                        ];
-                      }}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "none",
-                        boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-                        direction: "rtl",
-                      }}
-                    />
-                  </PieChart>
-                );
-              }}
-            </ChartContainer>
+  const body =
+    slices.length === 0 ? (
+      <p className={`${embedded ? "mt-3" : "mt-4"} text-sm text-text-secondary`}>
+        {emptyMessage}
+      </p>
+    ) : (
+      <ChartErrorBoundary label={chartLabel}>
+        <div>
+          <ChartContainer height={height} className={embedded ? "mt-2" : undefined}>
+            {({ width, height: h }) => {
+              const size = Math.min(width, h);
+              return (
+                <PieChart width={width} height={h}>
+                  <Pie
+                    data={slices}
+                    dataKey="value"
+                    nameKey="label"
+                    cx={width / 2}
+                    cy={h / 2}
+                    innerRadius={size * 0.28}
+                    outerRadius={size * 0.42}
+                    paddingAngle={2}
+                    stroke="none"
+                    isAnimationActive={false}
+                  >
+                    {slices.map((slice) => (
+                      <Cell key={slice.id} fill={slice.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, _name, item) => {
+                      const share = (item?.payload as SliceRow | undefined)?.share;
+                      return [
+                        `${formatIls(Number(value))} · ${formatSharePercent(share)}`,
+                        (item?.payload as SliceRow | undefined)?.label ?? "",
+                      ];
+                    }}
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: "none",
+                      boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                      direction: "rtl",
+                    }}
+                  />
+                </PieChart>
+              );
+            }}
+          </ChartContainer>
 
+          {showLegend && (
             <ul className="mt-2 max-h-64 space-y-2.5 overflow-y-auto">
               {slices.map((slice) => (
                 <li
@@ -147,16 +160,42 @@ export function AllocationPieCard({
                 </li>
               ))}
             </ul>
+          )}
 
-            {total != null && (
-              <p className="mt-4 border-t border-black/5 pt-3 text-sm text-text-secondary">
-                {totalLabel}{" "}
-                <span className="font-semibold text-text-primary">{formatIls(total)}</span>
-              </p>
-            )}
-          </div>
-        </ChartErrorBoundary>
-      )}
+          {showTotal && total != null && (
+            <p className="mt-4 border-t border-black/5 pt-3 text-sm text-text-secondary">
+              {totalLabel}{" "}
+              <span className="font-semibold text-text-primary">
+                {formatIls(total)}
+              </span>
+            </p>
+          )}
+        </div>
+      </ChartErrorBoundary>
+    );
+
+  if (embedded) {
+    return (
+      <div className="mt-5">
+        <p className="text-sm font-semibold text-text-primary">{title}</p>
+        {subtitle ? (
+          <p className="mt-0.5 text-xs text-text-secondary">{subtitle}</p>
+        ) : null}
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <section className="rounded-[20px] bg-card p-6 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-text-primary">{title}</h3>
+          <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
+        </div>
+        {headerRight}
+      </div>
+      {body}
     </section>
   );
 }

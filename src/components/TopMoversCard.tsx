@@ -1,12 +1,34 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import { useMemo } from "react";
+import { buildAllocationSlices } from "@/components/AllocationPieCard";
 import {
   formatIls,
   formatIlsChange,
   formatPercent,
+  formatSharePercent,
   signColorClass,
 } from "@/lib/format";
-import type { BreakdownItem, MonthPoint } from "@/lib/types";
+import type { MonthPoint } from "@/lib/types";
 import type { ExpenseAnomaly, Mover, TopMovers } from "@/lib/tierOne";
+import {
+  computeAllocationDrift,
+  type AllocationDriftItem,
+} from "@/lib/tierTwo";
 
+const AssetAllocationChart = dynamic(
+  () =>
+    import("@/components/AssetAllocationChart").then(
+      (m) => m.AssetAllocationChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-5 h-[200px] animate-pulse rounded-xl bg-page" />
+    ),
+  },
+);
 type Props = {
   movers: TopMovers;
   anomalies: ExpenseAnomaly[];
@@ -111,35 +133,10 @@ export function TopMoversCard({ movers, anomalies }: Props) {
   );
 }
 
-type AssetColumn = {
-  id: string;
-  label: string;
-  value: number;
-  delta: number | null;
-};
-
-function buildAssetColumns(
-  current: BreakdownItem[],
-  previous: BreakdownItem[] | null,
-): AssetColumn[] {
-  const prevMap = new Map((previous ?? []).map((a) => [a.id, a.value]));
-  return current
-    .filter((a) => a.value !== 0 || (prevMap.get(a.id) ?? 0) !== 0)
-    .map((a) => {
-      const prev = previous == null ? null : (prevMap.get(a.id) ?? 0);
-      return {
-        id: a.id,
-        label: a.label,
-        value: a.value,
-        delta: prev == null ? null : a.value - prev,
-      };
-    });
-}
-
 /** Black outline icons keyed by eras.config asset `id`. */
 function AssetIcon({ id }: { id: string }) {
   const common = {
-    className: "h-6 w-6 text-text-primary",
+    className: "h-9 w-9 text-text-primary",
     viewBox: "0 0 24 24",
     fill: "none" as const,
     stroke: "currentColor",
@@ -211,24 +208,75 @@ function AssetIcon({ id }: { id: string }) {
   }
 }
 
-/** Horizontal asset columns: icon · name · value · MoM change. */
+function DriftColumn({
+  col,
+  showDivider,
+  color,
+}: {
+  col: AllocationDriftItem;
+  showDivider: boolean;
+  color?: string;
+}) {
+  return (
+    <div
+      className={`flex min-w-[7.25rem] flex-1 flex-col items-center px-3 text-center ${
+        showDivider ? "border-e border-black/10" : ""
+      }`}
+    >
+      <div className="mb-2.5 flex h-10 items-center justify-center">
+        <AssetIcon id={col.id} />
+      </div>
+      <p className="text-sm font-medium leading-snug text-text-secondary">
+        {col.label}
+      </p>
+      <p className="mt-2 text-sm font-semibold tabular-nums">
+        <span style={color ? { color } : undefined}>
+          {formatSharePercent(col.share)}
+        </span>
+      </p>
+      <p className="mt-1 text-lg font-bold tracking-tight text-text-primary">
+        {formatIls(col.value)}
+      </p>
+      <p className={`mt-1 text-sm font-semibold ${signColorClass(col.delta)}`}>
+        {col.delta == null ? "—" : formatIlsChange(col.delta)}
+      </p>
+      <p
+        className={`mt-1 text-xs font-semibold ${signColorClass(col.shareDelta)}`}
+      >
+        {col.shareDelta == null ? "—" : formatPercent(col.shareDelta)}
+      </p>
+    </div>
+  );
+}
+
+/** Horizontal asset columns + embedded allocation donut (legend on columns). */
 export function AssetsMoversCard({
   current,
   previous,
+  data,
+  yearMonth,
 }: {
   current: MonthPoint | null;
   previous: MonthPoint | null;
+  data: MonthPoint[];
+  yearMonth: string;
 }) {
-  const columns = current
-    ? buildAssetColumns(current.assets, previous?.assets ?? null)
-    : [];
+  const columns = computeAllocationDrift(current, previous);
+  const colorsById = useMemo(() => {
+    if (!current) return new Map<string, string>();
+    const slices = buildAllocationSlices(current.assets, current.netWorth);
+    return new Map(slices.map((s) => [s.id, s.color]));
+  }, [current]);
 
   return (
     <section className="rounded-[20px] bg-card p-6 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       <p className="text-sm text-text-secondary">מה השתנה החודש</p>
       <h2 className="mt-1 text-lg font-semibold text-text-primary">
-        נכסים מול חודש קודם
+        נכסים והקצאה מול חודש קודם
       </h2>
+      <p className="mt-1 text-xs text-text-secondary">
+        שינוי ב־₪ וחלק מהשווי הנקי (%)
+      </p>
       {columns.length === 0 ? (
         <p className="mt-3 text-sm text-text-secondary">
           אין פירוט נכסים לחודש זה.
@@ -236,30 +284,23 @@ export function AssetsMoversCard({
       ) : (
         <div className="-mx-1 mt-5 flex gap-0 overflow-x-auto px-1 pb-1">
           {columns.map((col, i) => (
-            <div
+            <DriftColumn
               key={col.id}
-              className={`flex min-w-[6.5rem] flex-1 flex-col items-center px-3 text-center ${
-                i < columns.length - 1 ? "border-e border-black/10" : ""
-              }`}
-            >
-              <div className="mb-2.5 flex h-8 items-center justify-center">
-                <AssetIcon id={col.id} />
-              </div>
-              <p className="text-xs font-medium leading-snug text-text-secondary">
-                {col.label}
-              </p>
-              <p className="mt-2 text-sm font-bold tracking-tight text-text-primary">
-                {formatIls(col.value)}
-              </p>
-              <p
-                className={`mt-1 text-xs font-semibold ${signColorClass(col.delta)}`}
-              >
-                {col.delta == null ? "—" : formatIlsChange(col.delta)}
-              </p>
-            </div>
+              col={col}
+              showDivider={i < columns.length - 1}
+              color={colorsById.get(col.id)}
+            />
           ))}
         </div>
       )}
+
+      {yearMonth ? (
+        <AssetAllocationChart
+          data={data}
+          yearMonth={yearMonth}
+          embedded
+        />
+      ) : null}
     </section>
   );
 }

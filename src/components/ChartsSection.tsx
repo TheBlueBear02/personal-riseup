@@ -1,9 +1,7 @@
 "use client";
 
 import { NetWorthChart } from "@/components/NetWorthChart";
-import { AssetAllocationChart } from "@/components/AssetAllocationChart";
 import { IncomeExpensesChart } from "@/components/IncomeExpensesChart";
-import { ExpenseBreakdownChart } from "@/components/ExpenseBreakdownChart";
 import { ExpenseTypeHistoryChart } from "@/components/ExpenseTypeHistoryChart";
 import { CashflowChart } from "@/components/CashflowChart";
 import type { MonthPoint } from "@/lib/types";
@@ -14,14 +12,12 @@ type Props = {
   era: EraFilter;
 };
 
-/** Client-only charts bundle — loaded with ssr:false from the page. */
+/** Client-only history charts — pies live in DashboardTop (month summary). */
 export default function ChartsSection({ data, era }: Props) {
   return (
     <>
       <NetWorthChart data={data} era={era} />
-      <AssetAllocationChart data={data} />
       <IncomeExpensesChart data={data} era={era} />
-      <ExpenseBreakdownChart data={data} />
       <ExpenseTypeHistoryChart data={data} era={era} />
       <CashflowChart data={data} era={era} />
     </>

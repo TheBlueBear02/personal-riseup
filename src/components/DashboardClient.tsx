@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DashboardTop } from "@/components/DashboardTop";
 import { EraNavigator } from "@/components/EraNavigator";
+import { EraComparisonCard } from "@/components/EraComparisonCard";
+import { YearSummaryCard } from "@/components/YearSummaryCard";
+import { GoalsCard } from "@/components/GoalsCard";
+import { FireCard } from "@/components/FireCard";
 import { PeriodChangeCard } from "@/components/PeriodChangeCard";
 import { ClientCharts } from "@/components/ClientCharts";
 import { InsightCards } from "@/components/InsightCards";
@@ -10,6 +14,8 @@ import type { Insights } from "@/lib/insights";
 import type { MonthPoint } from "@/lib/types";
 import { DEFAULT_ERA, type EraFilter } from "@/lib/eraFilter";
 import { computeStreaks } from "@/lib/tierOne";
+import { computeEraComparison } from "@/lib/tierTwo";
+import { computeFireSnapshot, computeGoalProgress } from "@/lib/wealth";
 
 type Props = {
   data: MonthPoint[];
@@ -23,6 +29,9 @@ export function DashboardClient({ data, insights }: Props) {
     data,
     data.length > 0 ? data.length - 1 : 0,
   );
+  const eraStats = useMemo(() => computeEraComparison(data), [data]);
+  const goals = useMemo(() => computeGoalProgress(data), [data]);
+  const fire = useMemo(() => computeFireSnapshot(data), [data]);
 
   return (
     <>
@@ -30,6 +39,10 @@ export function DashboardClient({ data, insights }: Props) {
       <EraNavigator value={era} onChange={setEra} />
       <PeriodChangeCard data={data} era={era} />
       <ClientCharts data={data} era={era} />
+      <GoalsCard goals={goals} data={data} />
+      <FireCard fire={fire} />
+      <YearSummaryCard data={data} />
+      <EraComparisonCard eras={eraStats} />
       <InsightCards insights={insights} streaks={streaks} />
     </>
   );

@@ -11,8 +11,8 @@ This document is the single source of truth for the build. It contains everythin
 **Goal:** Connect an auto-updating Google Sheets file to a web app that shows, over the full timeline:
 
 - **Net worth** (assets total) over time
-- **Asset allocation** (latest month): % and ₪ per asset type from the assets tab line items
-- **Expense breakdown**: pie of expense types for a selected month (current year) or year summary (YTD / past years)
+- **Asset allocation** (selected month via month navigator): donut embedded in נכסים והקצאה; % on the asset columns (donut slice colors)
+- **Expense breakdown**: pie embedded in צרכים מול מותרות (month navigator); category % · ₪ in the expand list
 - **Expense type history**: pick a type → monthly amounts over time (with timeframe filter)
 - **Monthly cash flow** (the Riseup "hero" number: income − expenses)
 - **Income vs. expenses** over time
@@ -25,12 +25,19 @@ This document is the single source of truth for the build. It contains everythin
   - Needs vs luxuries spend split (`kind` on expense line items; from sheet banners צרכים / מותרות)
   - Positive-cashflow / high-savings streaks
   - Top movers (expense + asset MoM deltas)
+- **Tier‑2 extras** (existing timeline / config only):
+  - Asset MoM + **allocation drift** (share of NW + MoM pp change per asset)
+  - **Era comparison** card (avg cashflow, savings rate, expense mix per era)
+  - **Year summary** / annual report card (income, expenses, saved, best/worst month, top categories)
+- **Wealth / long-term path:**
+  - **Goals / targets** — progress meters from `goals.config.ts` (NW milestones, emergency fund via asset ids)
+  - **FIRE snapshot** — שנות מחייה (NW ÷ annual expenses) + 4% safe-withdrawal income
 
 **Design language:** Riseup-inspired — calm, green-forward, one big hero number, minimal chrome. Hebrew UI, right-to-left (RTL). Currency is **₪ (ILS) only**.
 
 **Explicitly OUT of scope for the MVP** (do not build these yet):
 
-- ❌ FIRE math (safe-withdrawal %, "years of living" / שנות מחייה, 3%/4% columns)
+- ❌ Full FIRE planning (glide paths, contribution schedules, Monte Carlo) — only the lightweight snapshot above
 - ❌ Income-side category pie (work / passive / freelance) — income stays total-only for now
 - ❌ Budget / "expected to spend" bars
 - ❌ Multi-currency ($ / €) — those are derived columns; ignore them
@@ -218,31 +225,44 @@ Single page, RTL, Hebrew, green-forward. Sections top to bottom:
    - **Right half — cash flow (Riseup signature):** personalized greeting → bold month statement → selected month's cash flow (income − expenses) as a prominent number, green/red by sign → one-line savings caption replacing the old "נשאר בחודש זה" — e.g. **39.6% מהכנסה נחסך החודש** (`cashflow / income`, no sparkline) → bottom row with **סה״כ הכנסות** and **סה״כ הוצאות** flush side-by-side (`gap-0`).
    - **Left half — net worth:** two titles matching right-side sizes — small **שווי נקי**, then semibold **שווי כלל הנכסים החודש** → big number → same bottom hairline as the right half → MoM change (₪ and %) below the line, aligned with the income/expenses row. Vertical hairline separates the halves.
 
-2b. **YoY same-month compare** — last card in `DashboardTop` (above the era navigator). Selected month vs same `MM` one year earlier (lookup by `yearMonth`). Three-column layout: large month names as column headers; metric labels (תזרים / הכנסות / הוצאות / שווי נקי) centered with ₪ Δ and % change under each; amounts flanking each label. No footer summary line. Empty state if prior year missing.
-
 2d. **מה השתנה החודש** — two-column card: expense MoM movers + above-average expense anomalies (up to 3 categories above trailing 6‑mo avg). Empty anomaly column when history is thin or all at/below average.
 
-2e. **נכסים מול חודש קודם** — horizontal columns per asset: black outline icon by asset `id` (checking / brokerage / pension / money_market / child_savings + wallet fallback), name, this‑month ₪ value, MoM ₪ change. Scrolls horizontally when many types; shows all non‑zero assets for the selected month.
+2d2. **Expense breakdown (pie)** — embedded inside **צרכים מול מותרות** (`NeedsLuxuriesCard`), under the needs/luxuries bar totals and **above** the “הצג פירוט הוצאות” button. Locked to the month navigator. Donut only — **no legend list** under the pie (`AllocationPieCard` `embedded` + `showLegend={false}`). Category detail (₪ + **% of month expenses**) lives in the expand list.
 
-2f. **Needs vs luxuries (צרכים מול מותרות)** — bar + totals from `expenseLineItems[].kind` in `eras.config`, based on the sheet’s row‑2 banners under הוצאות (`need` indigo / `luxury` green), with site-only overrides allowed (sheet is never written). Current era: צרכים K–Q (except אוכל בחוץ) + דירה W–AA → `need`; מותרות R–V + אוכל בחוץ (M) + מנויים AB–AC → `luxury`. Army era: צרכים J → `need`; מותרות M–Q → `luxury`. Under the bar: **צרכים** on the right, **מותרות** flush on the visual left. Expand control reveals each expense line under its category (sorted largest-first; optional unclassified group). Unclassified kinds (if any) are a gray remainder on the bar.
+2f. **Needs vs luxuries (צרכים מול מותרות)** — after expense movers. Bar + totals from `expenseLineItems[].kind` in `eras.config`, based on the sheet’s row‑2 banners under הוצאות (`need` indigo / `luxury` green), with site-only overrides allowed (sheet is never written). Current era: צרכים K–Q (except אוכל בחוץ) + דירה W–AA → `need`; מותרות R–V + אוכל בחוץ (M) + מנויים AB–AC → `luxury`. Army era: צרכים J → `need`; מותרות M–Q → `luxury`. Under the bar: **צרכים** on the right, **מותרות** flush on the visual left → **expense pie** → expand control. Expand reveals each expense line under its category with **share % (donut slice color) · ₪** plus a matching color dot (sorted largest-first; optional unclassified group). Unclassified kinds (if any) are a gray remainder on the bar.
 
-2g. **Era navigator** — centered `‹ תקופת חיים ›` (`EraNavigator`, same chrome as month nav). Cycles **כל התקופות** / each era label from config (default **כל התקופות**). Owned by `DashboardClient`; scopes **period gain/loss** + every chart that used to have its own era dropdown (net worth, income vs expenses, expense-type history, cashflow). Asset allocation pie and expense breakdown pie stay **unscoped** (month/year models of their own). Per-card `EraSelect` dropdowns are removed.
+2e. **נכסים והקצאה מול חודש קודם** — horizontal columns per asset (`AssetsMoversCard` via `computeAllocationDrift`): larger outline icon → name → **allocation %** (donut slice color, above the ₪) → larger ₪ value → MoM ₪ change → MoM allocation pp drift at the bottom. Scrolls horizontally when many types. Below the columns: **embedded asset allocation pie** (`AssetAllocationChart` `embedded` — donut only, **no legend list**; % lives on the columns).
+
+2e2. **Asset allocation (pie)** — inside §7.2e (not a standalone card). Locked to the month navigator. Donut of each type’s share of `netWorth`; legend removed in favor of colored % on the asset columns.
+
+2b. **YoY same-month compare** — last card in `DashboardTop` (above the era navigator). Selected month vs same `MM` one year earlier (lookup by `yearMonth`). Three-column layout: large month names as column headers; metric labels (תזרים / הכנסות / הוצאות / שווי נקי) centered with ₪ Δ and % change under each; amounts flanking each label. No footer summary line. Empty state if prior year missing.
+
+2g. **Era navigator** — centered `‹ תקופת חיים ›` (`EraNavigator`, same chrome as month nav). Cycles **כל התקופות** / each era label from config (default **כל התקופות**). Owned by `DashboardClient`; scopes **period gain/loss** + every chart that used to have its own era dropdown (net worth, income vs expenses, expense-type history, cashflow). Expense/asset **pies live in `DashboardTop`** and follow the month navigator (not the era navigator). Per-card `EraSelect` dropdowns are removed.
 
 3. **Period gain/loss** — interactive card: **period** dropdown only (**3 / 6 / 12 חודשים / הכל**, default **6**); era comes from §7.2g. Headline = net-worth change over the trailing window within the selected era scope (`latest − startOfWindow`), signed + colored, with %. Sub-row: sum of cashflow, total income, total expenses in that window. If fewer months exist than requested, uses all available and notes it.
 
-4. **Net worth over time** — line/area chart. **No left (Y) axis** — values via tooltip only. **Timeframe dropdown** only (era from §7.2g): **הכל** / **12 חודשים** / one option per calendar year in the era-scoped data (newest first). Default timeframe **הכל**. Year options recalculate when the global era changes; an invalid year selection falls back to the chart default.
+4. **Net worth over time** — dual view with toggle **מגמה / הרכב** (`NetWorthChart`):
+   - **מגמה** (default): area chart of total NW. **No left (Y) axis** — values via tooltip only.
+   - **הרכב**: stacked bar chart — each month’s bar height ≈ NW, segments = asset ₪ **> 0 only** (negatives / zeros omitted; stable colors by asset id, ordered by total positive ₪ in the window). Tooltip shows ₪ + % of that month’s NW for non-zero segments. Compact color legend under the chart.
+   - Shared **timeframe** dropdown (era from §7.2g): **הכל** / **12 חודשים** / calendar years (newest first). Default timeframe **הכל**.
 
-5. **Asset allocation (pie)** — latest month with asset line items. Donut/pie of each type’s share of `netWorth` (₪ + %). Legend lists label, %, and value. Zero / empty types omitted. Config-driven labels from that month’s era `lineItems`. *(Not scoped by global era navigator — single-month snapshot.)*
+5. **Income vs. Expenses over time** — two lines (green income, red expenses). **No left (Y) axis** — values via tooltip only. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**.
 
-6. **Income vs. Expenses over time** — two lines (green income, red expenses). **No left (Y) axis** — values via tooltip only. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**.
+6. **Expense type history** — expense-type + timeframe dropdowns (era from §7.2g). Bar chart of that type’s monthly ₪ over the selected window. When an era is selected, the type list is that era’s `expenseLineItems` only; when **כל התקופות**, current-era types first then extras. Header shows **סה״כ** for the selected type × timeframe (sum of bars), plus **count of months with non-zero** and **first–last active month** labels within that window. Months that don’t include that type are skipped. Defaults: type = first current-era `expenseLineItems` entry, timeframe **12 חודשים**.
 
-7. **Expense breakdown (pie)** — period dropdown: each month present in the **current calendar year** (newest first), then **year summaries** — current year as `סיכום YYYY עד כה` (aggregate of months reported so far), then prior years `סיכום YYYY` (full calendar year of available data). Donut + legend of `expenseLineItems` shares of expenses total; zeros omitted; sorted largest-first. Default = newest current-year month (else newest year summary). *(Not scoped by global era navigator — own month/year period model.)*
+7. **Cash flow over time** — bar chart, per month; positive/negative colored. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**.
 
-8. **Expense type history** — expense-type + timeframe dropdowns (era from §7.2g). Bar chart of that type’s monthly ₪ over the selected window. When an era is selected, the type list is that era’s `expenseLineItems` only; when **כל התקופות**, current-era types first then extras. Header shows **סה״כ** for the selected type × timeframe (sum of bars), plus **count of months with non-zero** and **first–last active month** labels within that window. Months that don’t include that type are skipped. Defaults: type = first current-era `expenseLineItems` entry, timeframe **12 חודשים**.
+*(Asset allocation pie and expense breakdown pie are in the month-summary block §7.2d2 / §7.2e2 — not in the charts stack.)*
 
-9. **Cash flow over time** — bar chart, per month; positive/negative colored. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**.
+10. **Goals** — `GoalsCard` from `goals.config.ts` + `computeGoalProgress`. Each goal: label, ₪ target (fixed `target` **or** dynamic `expenseMonths` = sum of last N months' expenses), metric (`netWorth` or sum of `assetIds`), progress bar (indigo / green when complete), current/target, remaining. **Tap a goal row** to expand a history line chart (`GoalHistoryChart` via `goalHistorySeries`): full-timeline metric (NW or asset sum) with a coral dashed **target ReferenceLine**. Default goals (top→bottom): **האפס החדש** (עו״ש → ₪5,000), **קרן חירום** (`expenseMonths: 6` vs עו״ש + קרן כספית), **יעד תיק השקעות** (תיק IB → ₪100,000), **אבן דרך · 250 אלף** (NW). Edit in config only (never written to the sheet). Uses **newest** timeline month for progress (not month navigator); chart uses full history.
 
-10. **Insight cards** — see §8.
+11. **FIRE snapshot** — `FireCard` via `computeFireSnapshot`: שנות מחייה = latest NW ÷ (avg monthly expenses × 12 over trailing ≤12 months with expenses), plus 4% annual withdrawal (`NW × 0.04`). Shows NW + estimated annual expenses; notes thin history when fewer than 3 expense months.
+
+12. **Year summary** — annual report card (`YearSummaryCard`) with year dropdown (newest first; current year labeled `YYYY עד כה`). Totals: income, expenses, cashflow sum, avg savings rate, NW start→end change + end NW, best/worst cashflow month in that year, top 5 expense categories by year total. Driven by full timeline (not month navigator). Helpers in `tierTwo.ts`.
+
+13. **Era comparison** — just above insight cards (`EraComparisonCard`). Side‑by‑side columns per era present in the timeline (`computeEraComparison`): months counted, avg cashflow / savings rate / income / expenses, top 3 expense types by average monthly ₪. Footer hints when exactly two eras (cashflow Δ + savings-rate pair). Empty state if fewer than two eras. Placed after year summary, immediately above תובנות.
+
+14. **Insight cards** — see §8.
 
 ### 7.1 Design tokens (derived from the Riseup reference)
 
@@ -269,7 +289,7 @@ Mirror Riseup's **aesthetic**, not its out-of-scope features. In particular, **d
 
 **Month-comparison bar chart:** titled like "החודש ביחס לחודשים אחרים". Clean, **no gridlines**, value labels above each bar, month abbreviations below, green bars for positive cash flow and coral for negative, thin zero baseline. This is the cash-flow-over-time chart from §7.
 
-**Month navigator (required):** see §7.0 — lives in `DashboardTop` with Tier‑1 cards. Chart section and bottom insight grid stay on the **newest** month / full timeline for insights (not tied to the month navigator). Era scoping for charts/period card is §7.2g.
+**Month navigator (required):** see §7.0 — lives in `DashboardTop` with Tier‑1 cards **and** the expense/asset pies (all follow the selected month). The lower history-chart stack and bottom insight grid stay on the **newest** month / full timeline for insights (not tied to the month navigator). Era scoping for charts/period card is §7.2g.
 
 **RTL:** `dir="rtl"` on the root, right-aligned text, chart axes/legends oriented for Hebrew. Month and era navigators force `dir="ltr"` for chevron order only.
 
@@ -297,6 +317,8 @@ All computed from `MonthPoint[]`, nothing else:
 
 **Tier‑1 helpers** live in `src/lib/tierOne.ts` (anomalies, YoY, streaks, movers, needs/luxuries, savings-rate series).
 
+**Tier‑2 helpers** live in `src/lib/tierTwo.ts` (allocation drift, era comparison, year summary).
+
 Keep the bottom insight cards as a **2-column grid on all breakpoints** (including mobile). No projections, no withdrawal rates.
 
 ---
@@ -318,20 +340,25 @@ Keep the bottom insight cards as a **2-column grid on all breakpoints** (includi
     ClientCharts.tsx        # client boundary for dynamic(..., { ssr: false })
     ChartsSection.tsx       # client-only charts wrapper
     TimeframeSelect.tsx     # per-chart timeframe dropdown (הכל / 12mo / years)
-    DashboardClient.tsx     # client: global era + DashboardTop + period + charts + insights
-    DashboardTop.tsx        # client: month index + heroes + Tier‑1 cards
+    DashboardClient.tsx     # client: global era + DashboardTop + period + charts + goals + FIRE + year summary + era compare + insights
+    DashboardTop.tsx        # client: month index + heroes + expense/asset month pies + Tier‑1 cards
     MonthNavigator.tsx      # ‹ month › chevrons (ltr order)
     EraNavigator.tsx        # ‹ era › chevrons — scopes period card + era-aware charts
+    GoalsCard.tsx           # wealth: progress meters; expand → GoalHistoryChart
+    GoalHistoryChart.tsx    # wealth: line history + coral target ReferenceLine
+    FireCard.tsx            # wealth: years of living + 4% withdrawal
+    EraComparisonCard.tsx   # Tier‑2: side-by-side era averages + expense mix
+    YearSummaryCard.tsx     # Tier‑2: annual report card with year picker
     HeroCards.tsx           # HeroSummary (cashflow + net worth + inline savings %)
     YoYCompareCard.tsx      # same-month last year
-    TopMoversCard.tsx       # מה השתנה: expense movers + anomalies; AssetsMoversCard
-    NeedsLuxuriesCard.tsx   # needs vs luxuries spend bar
+    TopMoversCard.tsx       # מה השתנה: expense movers + anomalies; AssetsMoversCard (+ embedded asset pie)
+    NeedsLuxuriesCard.tsx   # needs vs luxuries + embedded expense pie + % detail list
     PeriodChangeCard.tsx    # made/lost over last N months (client; era from prop)
-    NetWorthChart.tsx
-    AllocationPieCard.tsx   # shared donut + legend for allocation pies
-    AssetAllocationChart.tsx # pie: latest month asset types (% + ₪)
+    NetWorthChart.tsx       # NW trend area + composition stacked bars (מגמה/הרכב toggle)
+    AllocationPieCard.tsx   # shared donut (+ optional legend); supports embedded mode
+    AssetAllocationChart.tsx # pie: selected-month assets (embedded in AssetsMoversCard)
     IncomeExpensesChart.tsx
-    ExpenseBreakdownChart.tsx # pie: latest month expense types (% + ₪)
+    ExpenseBreakdownChart.tsx # pie: selected-month expenses (embedded in NeedsLuxuriesCard)
     ExpenseTypeHistoryChart.tsx # bar: selected expense type over time
     CashflowChart.tsx
     InsightCards.tsx        # §8 insight grid (includes streaks)
@@ -353,8 +380,11 @@ Keep the bottom insight cards as a **2-column grid on all breakpoints** (includi
     dates.ts                # DD.MM.YYYY parse + yearMonth
     insights.ts             # the §8 calculations (optional atIndex)
     tierOne.ts              # anomalies, YoY, streaks, movers, needs/luxuries, rate series
+    tierTwo.ts              # allocation drift, era comparison, year summary
+    wealth.ts               # goal progress + history series + FIRE snapshot
     format.ts               # ₪ / % / Hebrew month formatters (leading +/- via LRM in RTL)
   eras.config.ts            # THE config (owner fills column letters + expense kind)
+  goals.config.ts           # wealth goals: targets + metric (netWorth / asset ids)
 .env.local                  # secrets (gitignored)
 .env.local.example
 .gitignore
@@ -410,6 +440,9 @@ For each `TODO` in §5: open the relevant tab, click the exact total/date cell, 
 From the sheet URL: `https://docs.google.com/spreadsheets/d/`**`THIS_PART`**`/edit`. Put it in `.env.local`.
 
 **H. Fill `.env.local`** with the ID, the JSON key, and `SITE_PASSWORD` (§10), then run `npm run dev`. Visit `/`, enter the password, and you should land on `/dashboard`.
+
+**I. Tune wealth goals** (`goals.config.ts`)
+Edit fixed `target` ₪ amounts, or use `expenseMonths` for a dynamic target (sum of last N months' expenses — e.g. קרן חירום = 6). Emergency fund uses `metric: "assets"` + `assetIds` (checking + money_market). NW milestones use `metric: "netWorth"`. No sheet changes needed.
 
 ---
 
