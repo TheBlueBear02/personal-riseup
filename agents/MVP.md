@@ -229,9 +229,9 @@ Single page, RTL, Hebrew, green-forward. Sections top to bottom:
 
 2d2. **Expense breakdown (pie)** — embedded inside **צרכים מול מותרות** (`NeedsLuxuriesCard`), under the needs/luxuries bar totals and **above** the “הצג פירוט הוצאות” button. Locked to the month navigator. Donut only — **no legend list** under the pie (`AllocationPieCard` `embedded` + `showLegend={false}`). Category detail (₪ + **% of month expenses**) lives in the expand list.
 
-2f. **Needs vs luxuries (צרכים מול מותרות)** — after expense movers. Bar + totals from `expenseLineItems[].kind` in `eras.config`, based on the sheet’s row‑2 banners under הוצאות (`need` indigo / `luxury` green), with site-only overrides allowed (sheet is never written). Current era: צרכים K–Q (except אוכל בחוץ) + דירה W–AA → `need`; מותרות R–V + אוכל בחוץ (M) + מנויים AB–AC → `luxury`. Army era: צרכים J → `need`; מותרות M–Q → `luxury`. Under the bar: **צרכים** on the right, **מותרות** flush on the visual left → **expense pie** → expand control. Expand reveals each expense line under its category with **share % (donut slice color) · ₪** plus a matching color dot (sorted largest-first; optional unclassified group). Unclassified kinds (if any) are a gray remainder on the bar.
+2f. **Needs vs luxuries (צרכים מול מותרות)** — after expense movers. Header shows **סה״כ הוצאות החודש** as a prominent coral total (`MonthPoint.expenses` for the navigator month). Bar + totals from `expenseLineItems[].kind` in `eras.config`, based on the sheet’s row‑2 banners under הוצאות (`need` indigo / `luxury` green), with site-only overrides allowed (sheet is never written). Current era: צרכים K–Q (except אוכל בחוץ) + דירה W–AA → `need`; מותרות R–V + אוכל בחוץ (M) + מנויים AB–AC → `luxury`. Army era: צרכים J → `need`; מותרות M–Q → `luxury`. Under the bar: **צרכים** on the right, **מותרות** flush on the visual left → **expense pie** → expand control. Expand reveals each expense line under its category with **share % (donut slice color) · ₪** plus a matching color dot (sorted largest-first; optional unclassified group). Unclassified kinds (if any) are a gray remainder on the bar.
 
-2e. **נכסים והקצאה מול חודש קודם** — horizontal columns per asset (`AssetsMoversCard` via `computeAllocationDrift`): larger outline icon → name → **allocation %** (donut slice color, above the ₪) → larger ₪ value → MoM ₪ change → MoM allocation pp drift at the bottom. Scrolls horizontally when many types. Below the columns: **embedded asset allocation pie** (`AssetAllocationChart` `embedded` — donut only, **no legend list**; % lives on the columns).
+2e. **נכסים והקצאה מול חודש קודם** — header shows **סה״כ שווי נקי** as a prominent total (`current.netWorth`). Horizontal columns per asset (`AssetsMoversCard` via `computeAllocationDrift`): larger outline icon → name → **allocation %** (donut slice color, above the ₪) → larger ₪ value → MoM ₪ change → MoM allocation pp drift at the bottom. Scrolls horizontally when many types. Below the columns: **embedded asset allocation pie** (`AssetAllocationChart` `embedded` — donut only, **no legend list**; % lives on the columns).
 
 2e2. **Asset allocation (pie)** — inside §7.2e (not a standalone card). Locked to the month navigator. Donut of each type’s share of `netWorth`; legend removed in favor of colored % on the asset columns.
 
@@ -246,11 +246,11 @@ Single page, RTL, Hebrew, green-forward. Sections top to bottom:
    - **הרכב**: stacked bar chart — each month’s bar height ≈ NW, segments = asset ₪ **> 0 only** (negatives / zeros omitted; stable colors by asset id, ordered by total positive ₪ in the window). Tooltip shows ₪ + % of that month’s NW for non-zero segments. Compact color legend under the chart.
    - Shared **timeframe** dropdown (era from §7.2g): **הכל** / **12 חודשים** / calendar years (newest first). Default timeframe **הכל**.
 
-5. **Income vs. Expenses over time** — two lines (green income, red expenses). **No left (Y) axis** — values via tooltip only. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**.
+5. **Income vs. Expenses over time** — two lines (green income, red expenses). **No left (Y) axis** — values via tooltip only. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**. Header chip **ממוצע נע** (off by default): when on, **replaces** the monthly series with a 12‑month simple moving average for income and expenses (same green/red lines); subtitle notes the window. MA is computed on the **full era-scoped** series (so the selected timeframe still has trailing history), then filtered to the timeframe; months without a full window are **omitted** from the chart (`src/lib/movingAverage.ts`, `DEFAULT_MA_WINDOW = 12`).
 
 6. **Expense type history** — expense-type + timeframe dropdowns (era from §7.2g). Bar chart of that type’s monthly ₪ over the selected window. When an era is selected, the type list is that era’s `expenseLineItems` only; when **כל התקופות**, current-era types first then extras. Header shows **סה״כ** for the selected type × timeframe (sum of bars), plus **count of months with non-zero** and **first–last active month** labels within that window. Months that don’t include that type are skipped. Defaults: type = first current-era `expenseLineItems` entry, timeframe **12 חודשים**.
 
-7. **Cash flow over time** — bar chart, per month; positive/negative colored. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**.
+7. **Cash flow over time** — bar chart, per month; positive/negative colored. Timeframe dropdown only (era from §7.2g); default timeframe **12 חודשים**. Header chip **ממוצע נע** (off by default): when on, **replaces** monthly bars with a 12‑month simple moving average of cashflow (same green/red by sign); subtitle notes the window. Same as §7.5: MA on full era scope → timeframe filter → **omit months without a full window** (`src/lib/movingAverage.ts`).
 
 *(Asset allocation pie and expense breakdown pie are in the month-summary block §7.2d2 / §7.2e2 — not in the charts stack.)*
 
@@ -357,10 +357,10 @@ Keep the bottom insight cards as a **2-column grid on all breakpoints** (includi
     NetWorthChart.tsx       # NW trend area + composition stacked bars (מגמה/הרכב toggle)
     AllocationPieCard.tsx   # shared donut (+ optional legend); supports embedded mode
     AssetAllocationChart.tsx # pie: selected-month assets (embedded in AssetsMoversCard)
-    IncomeExpensesChart.tsx
+    IncomeExpensesChart.tsx # income/expense lines + optional 12‑mo MA view chip
     ExpenseBreakdownChart.tsx # pie: selected-month expenses (embedded in NeedsLuxuriesCard)
     ExpenseTypeHistoryChart.tsx # bar: selected expense type over time
-    CashflowChart.tsx
+    CashflowChart.tsx       # monthly cashflow bars + optional 12‑mo MA view chip
     InsightCards.tsx        # §8 insight grid (includes streaks)
     RefreshButton.tsx
     DisconnectButton.tsx    # form → logout (clears site_access cookie → /)

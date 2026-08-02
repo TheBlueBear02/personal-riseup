@@ -10,12 +10,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChartContainer, ChartErrorBoundary } from "@/components/ChartContainer";
 import { TimeframeSelect } from "@/components/TimeframeSelect";
 import type { MonthPoint } from "@/lib/types";
 import { formatIls, formatMonthLabel } from "@/lib/format";
 import { filterByEra, type EraFilter } from "@/lib/eraFilter";
+import {
+  DEFAULT_MA_WINDOW,
+  movingAverage,
+} from "@/lib/movingAverage";
 import {
   DEFAULT_TIMEFRAME,
   filterByTimeframe,
@@ -29,16 +33,73 @@ type Props = {
   era: EraFilter;
 };
 
+function MaToggle({
+  active,
+  onChange,
+}: {
+  active: boolean;
+  onChange: (active: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!active)}
+      aria-pressed={active}
+      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+        active
+          ? "border-indigo/40 bg-indigo/10 text-indigo"
+          : "border-black/10 bg-page text-text-secondary hover:border-indigo/40 hover:text-text-primary"
+      }`}
+    >
+      ממוצע נע
+    </button>
+  );
+}
+
 export function CashflowChart({ data, era }: Props) {
   const [timeframe, setTimeframe] = useState<Timeframe>(DEFAULT_TIMEFRAME);
+  const [showMa, setShowMa] = useState(false);
   const scoped = filterByEra(data, era);
   const options = timeframeOptions(scoped);
   const effectiveTimeframe = resolveTimeframe(timeframe, options);
-  const chartData = filterByTimeframe(scoped, effectiveTimeframe).map((p) => ({
-    yearMonth: p.yearMonth,
-    label: formatMonthLabel(p.yearMonth),
-    cashflow: p.cashflow ?? 0,
-  }));
+
+  const chartData = useMemo(() => {
+    const windowPoints = filterByTimeframe(scoped, effectiveTimeframe);
+
+    if (!showMa) {
+      return windowPoints.map((p) => ({
+        yearMonth: p.yearMonth,
+        label: formatMonthLabel(p.yearMonth),
+        cashflow: p.cashflow ?? 0,
+      }));
+    }
+
+    // MA over full era scope so timeframe months still get trailing history.
+    const cashflowMa = movingAverage(scoped.map((p) => p.cashflow));
+    const maByYm = new Map(
+      scoped.map((p, i) => [p.yearMonth, cashflowMa[i] ?? null]),
+    );
+
+    return windowPoints
+      .map((p) => {
+        const raw = maByYm.get(p.yearMonth);
+        const cashflow =
+          raw != null && Number.isFinite(raw) ? raw : null;
+        return {
+          yearMonth: p.yearMonth,
+          label: formatMonthLabel(p.yearMonth),
+          cashflow,
+        };
+      })
+      .filter(
+        (row): row is { yearMonth: string; label: string; cashflow: number } =>
+          row.cashflow != null,
+      );
+  }, [scoped, effectiveTimeframe, showMa]);
+
+  const subtitle = showMa
+    ? `תזרים · ממוצע נע ${DEFAULT_MA_WINDOW} חודשים`
+    : "תזרים חודשי";
 
   return (
     <section className="rounded-[20px] bg-card p-6 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
@@ -47,9 +108,10 @@ export function CashflowChart({ data, era }: Props) {
           <h3 className="text-base font-semibold text-text-primary">
             החודש ביחס לחודשים אחרים
           </h3>
-          <p className="mt-1 text-sm text-text-secondary">תזרים חודשי</p>
+          <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <MaToggle active={showMa} onChange={setShowMa} />
           <TimeframeSelect
             value={effectiveTimeframe}
             options={options}
@@ -79,7 +141,10 @@ export function CashflowChart({ data, era }: Props) {
               <YAxis hide domain={["dataMin - 1000", "dataMax + 1000"]} />
               <ReferenceLine y={0} stroke="#C7C7CC" strokeWidth={1} />
               <Tooltip
-                formatter={(value) => [formatIls(Number(value)), "תזרים"]}
+                formatter={(value) => [
+                  formatIls(Number(value)),
+                  showMa ? "ממוצע תזרים" : "תזרים",
+                ]}
                 contentStyle={{
                   borderRadius: 12,
                   border: "none",
@@ -96,7 +161,13 @@ export function CashflowChart({ data, era }: Props) {
                 {chartData.map((entry) => (
                   <Cell
                     key={entry.yearMonth}
-                    fill={entry.cashflow >= 0 ? "#2FBE6E" : "#EE7E6E"}
+                    fill={
+                      entry.cashflow == null
+                        ? "transparent"
+                        : entry.cashflow >= 0
+                          ? "#2FBE6E"
+                          : "#EE7E6E"
+                    }
                   />
                 ))}
                 <LabelList

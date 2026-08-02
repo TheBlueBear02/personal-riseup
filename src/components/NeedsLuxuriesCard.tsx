@@ -22,6 +22,8 @@ const ExpenseBreakdownChart = dynamic(
 
 type Props = {
   split: NeedsLuxuriesSplit;
+  /** Sheet monthly expenses total for the selected month. */
+  expenses: number | null;
   data: MonthPoint[];
   yearMonth: string;
 };
@@ -80,7 +82,12 @@ function ExpenseList({
   );
 }
 
-export function NeedsLuxuriesCard({ split, data, yearMonth }: Props) {
+export function NeedsLuxuriesCard({
+  split,
+  expenses,
+  data,
+  yearMonth,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
   const total = split.needs + split.luxuries + split.unclassified;
 
@@ -98,6 +105,14 @@ export function NeedsLuxuriesCard({ split, data, yearMonth }: Props) {
     return (
       <section className="rounded-[20px] bg-card p-6 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
         <p className="text-sm text-text-secondary">צרכים מול מותרות</p>
+        {expenses != null && (
+          <div className="mt-2 text-center">
+            <p className="text-2xl font-bold tracking-tight text-coral">
+              {formatIls(expenses)}
+            </p>
+            <p className="mt-1 text-sm text-text-secondary">סה״כ הוצאות החודש</p>
+          </div>
+        )}
         <p className="mt-3 text-sm text-text-secondary">אין פירוט הוצאות לחודש זה</p>
       </section>
     );
@@ -113,6 +128,14 @@ export function NeedsLuxuriesCard({ split, data, yearMonth }: Props) {
       <h2 className="mt-1 text-lg font-semibold text-text-primary">
         כמה מההוצאות הולכות לצרכים
       </h2>
+      {expenses != null && (
+        <div className="mt-2 text-center">
+          <p className="text-2xl font-bold tracking-tight text-coral">
+            {formatIls(expenses)}
+          </p>
+          <p className="mt-1 text-sm text-text-secondary">סה״כ הוצאות החודש</p>
+        </div>
+      )}
 
       <div
         className="mt-5 flex h-3 overflow-hidden rounded-full bg-black/5"
