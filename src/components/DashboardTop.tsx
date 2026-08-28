@@ -53,6 +53,7 @@ export function DashboardTop({ data }: Props) {
       <TopMoversCard movers={movers} anomalies={anomalies} />
       <NeedsLuxuriesCard
         split={needsLuxuries}
+        expenses={insights.latest?.expenses ?? null}
         data={data}
         yearMonth={yearMonth}
       />

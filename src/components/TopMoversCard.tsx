@@ -274,7 +274,15 @@ export function AssetsMoversCard({
       <h2 className="mt-1 text-lg font-semibold text-text-primary">
         נכסים והקצאה מול חודש קודם
       </h2>
-      <p className="mt-1 text-xs text-text-secondary">
+      {current?.netWorth != null && (
+        <div className="mt-2 text-center">
+          <p className="text-2xl font-bold tracking-tight text-text-primary">
+            {formatIls(current.netWorth)}
+          </p>
+          <p className="mt-1 text-sm text-text-secondary">סה״כ שווי נקי</p>
+        </div>
+      )}
+      <p className="mt-1 text-center text-xs text-text-secondary">
         שינוי ב־₪ וחלק מהשווי הנקי (%)
       </p>
       {columns.length === 0 ? (
