@@ -61,13 +61,14 @@ function toBreakdown(
 export function buildMockTimeline(seed = Date.now()): MonthPoint[] {
   const rng = createRng(seed);
   const army = ERAS.find((e) => e.id === "army") ?? ERAS[0]!;
+  const student = ERAS.find((e) => e.id === "student") ?? ERAS[1]!;
   const current = ERAS.find((e) => e.id === "current") ?? ERAS[ERAS.length - 1]!;
 
   const points: MonthPoint[] = [];
-  // ~18 army months then ~18 current — enough for timeframe / era filters.
   const armyMonths = 18;
-  const currentMonths = 18;
-  const totalMonths = armyMonths + currentMonths;
+  const studentMonths = 18;
+  const currentMonths = 12;
+  const totalMonths = armyMonths + studentMonths + currentMonths;
 
   // End on the previous calendar month so "current year" expense options look right.
   const end = new Date();
@@ -80,12 +81,25 @@ export function buildMockTimeline(seed = Date.now()): MonthPoint[] {
     const d = new Date(end.getFullYear(), end.getMonth() - (totalMonths - 1 - i), 1);
     const year = d.getFullYear();
     const monthIndex = d.getMonth();
-    const era = i < armyMonths ? army : current;
-    const eraProgress = i < armyMonths ? i / armyMonths : (i - armyMonths) / currentMonths;
+    const era =
+      i < armyMonths
+        ? army
+        : i < armyMonths + studentMonths
+          ? student
+          : current;
+    const eraProgress =
+      i < armyMonths
+        ? i / armyMonths
+        : i < armyMonths + studentMonths
+          ? (i - armyMonths) / studentMonths
+          : (i - armyMonths - studentMonths) / currentMonths;
 
     const isArmy = era.id === army.id;
-    const baseIncome = isArmy ? 4_200 : 14_500;
-    const income = roundMoney(baseIncome * (0.92 + rng() * 0.2) + (isArmy ? 0 : eraProgress * 2_500));
+    const isCurrent = era.id === current.id;
+    const baseIncome = isArmy ? 4_200 : isCurrent ? 16_500 : 12_500;
+    const income = roundMoney(
+      baseIncome * (0.92 + rng() * 0.2) + (isArmy ? 0 : eraProgress * 2_500),
+    );
 
     const baseExpenses = isArmy ? 3_100 : 9_800;
     const expenses = roundMoney(

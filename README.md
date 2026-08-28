@@ -39,7 +39,7 @@ GOOGLE_SERVICE_ACCOUNT_KEY=<full service-account JSON as one line>
 
 ### 4. Column letters
 
-Open `src/eras.config.ts` and replace every `"TODO"` with the real column letter from the sheet **Name Box** (top-left). Do this for both eras (four tabs). Trust the Name Box — the sheet is RTL.
+Open `src/eras.config.ts` and replace every `"TODO"` with the real column letter from the sheet **Name Box** (top-left). Do this for every era (two tabs per era). Trust the Name Box — the sheet is RTL.
 
 ### 5. Run
 

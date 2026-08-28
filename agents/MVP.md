@@ -50,12 +50,15 @@ Totals timeline is still the core. Asset and expense **types** come from `eras.c
 
 ## 2. The core challenge: "eras"
 
-The data lives in **one Google Sheets file** but is split across **eras** — life phases that each have their own pair of tabs with **different column layouts**. Today there are two eras (four tabs):
+The data lives in **one Google Sheets file** but is split across **eras** — life phases that each have their own pair of tabs with **different column layouts**. Today there are three eras (six tabs):
 
 | Era | Assets tab | Income/Expenses tab |
 |---|---|---|
 | Current | `דוח נכסים` | `הכנסות הוצאות` |
-| Army (previous) | `דוח נכסים - צבא` | `הכנסות הוצאות - צבא` |
+| Student (previous) | `דוח נכסים - סטודנט` | `הכנסות הוצאות - סטודנט` |
+| Army (earliest) | `דוח נכסים - צבא` | `הכנסות הוצאות - צבא` |
+
+`ERAS` in `eras.config.ts` is ordered **oldest → newest**; on duplicate `yearMonth` keys, later entries win.
 
 The naming suffix (` - צבא`) is a human label, **not** machine-parseable. When a new era starts, the owner will manually add a new pair of tabs.
 
@@ -165,7 +168,7 @@ export type Era = {
 };
 ```
 
-**Current era asset line items (דוח נכסים):** B עו״ש · C תיק השקעות IB · D קופת גמל · E קרן כספית בבנק (total = F).
+**Current / student era asset line items (דוח נכסים / דוח נכסים - סטודנט):** B עו״ש · C תיק השקעות IB · D קופת גמל · E קרן כספית בבנק (total = F).
 
 **Army era asset line items (דוח נכסים - צבא):** B עו״ש · C תיק השקעות Pepper · D תיק דרך אבא · E קופת גמל · F חסכון לכל ילד (total = G).
 
