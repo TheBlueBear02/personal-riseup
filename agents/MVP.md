@@ -168,11 +168,15 @@ export type Era = {
 };
 ```
 
-**Current / student era asset line items (דוח נכסים / דוח נכסים - סטודנט):** B עו״ש · C תיק השקעות IB · D קופת גמל · E קרן כספית בבנק (total = F).
+**Current era asset line items (דוח נכסים):** B עו״ש · C קרן כספית בבנק · D תיק השקעות IB · E פנסיה · F קרן השתלמות (total = G).
+
+**Student era asset line items (דוח נכסים - סטודנט):** B עו״ש · C תיק השקעות IB · D קופת גמל · E קרן כספית בבנק (total = F).
 
 **Army era asset line items (דוח נכסים - צבא):** B עו״ש · C תיק השקעות Pepper · D תיק דרך אבא · E קופת גמל · F חסכון לכל ילד (total = G).
 
-**Current era expense line items (הכנסות הוצאות):** K–AC individual categories (אוכל, שכירות, Cursor, …); expenses total = AD.
+**Current era expense line items (הכנסות הוצאות):** I–X individual categories (מצרכים, שכירות, Cursor, …); income total = G · expenses total = Y · cashflow total = AC.
+
+**Student era expense line items (הכנסות הוצאות - סטודנט):** K–AC individual categories; expenses total = AD · cashflow total = AH.
 
 **Army era expense line items (הכנסות הוצאות - צבא):** J אוכל · M פלאפון · N סלקום TV · O כרטיסים · P השכלה · Q שונות (total = R).
 
@@ -232,7 +236,7 @@ Single page, RTL, Hebrew, green-forward. Sections top to bottom:
 
 2d2. **Expense breakdown (pie)** — embedded inside **צרכים מול מותרות** (`NeedsLuxuriesCard`), under the needs/luxuries bar totals and **above** the “הצג פירוט הוצאות” button. Locked to the month navigator. Donut only — **no legend list** under the pie (`AllocationPieCard` `embedded` + `showLegend={false}`). Category detail (₪ + **% of month expenses**) lives in the expand list.
 
-2f. **Needs vs luxuries (צרכים מול מותרות)** — after expense movers. Header shows **סה״כ הוצאות החודש** as a prominent coral total (`MonthPoint.expenses` for the navigator month). Bar + totals from `expenseLineItems[].kind` in `eras.config`, based on the sheet’s row‑2 banners under הוצאות (`need` indigo / `luxury` green), with site-only overrides allowed (sheet is never written). Current era: צרכים K–Q (except אוכל בחוץ) + דירה W–AA → `need`; מותרות R–V + אוכל בחוץ (M) + מנויים AB–AC → `luxury`. Army era: צרכים J → `need`; מותרות M–Q → `luxury`. Under the bar: **צרכים** on the right, **מותרות** flush on the visual left → **expense pie** → expand control. Expand reveals each expense line under its category with **share % (donut slice color) · ₪** plus a matching color dot (sorted largest-first; optional unclassified group). Unclassified kinds (if any) are a gray remainder on the bar.
+2f. **Needs vs luxuries (צרכים מול מותרות)** — after expense movers. Header shows **סה״כ הוצאות החודש** as a prominent coral total (`MonthPoint.expenses` for the navigator month). Bar + totals from `expenseLineItems[].kind` in `eras.config`, based on the sheet’s row‑2 banners under הוצאות (`need` indigo / `luxury` green), with site-only overrides allowed (sheet is never written). Current era: צרכים I–M (except אוכל בחוץ) + דירה R–V → `need`; מותרות N–Q + אוכל בחוץ (J) + מנויים W–X → `luxury`. Student era: צרכים K–Q (except אוכל בחוץ) + דירה W–AA → `need`; מותרות R–V + אוכל בחוץ (M) + מנויים AB–AC → `luxury`. Army era: צרכים J → `need`; מותרות M–Q → `luxury`. Under the bar: **צרכים** on the right, **מותרות** flush on the visual left → **expense pie** → expand control. Expand reveals each expense line under its category with **share % (donut slice color) · ₪** plus a matching color dot (sorted largest-first; optional unclassified group). Unclassified kinds (if any) are a gray remainder on the bar.
 
 2e. **נכסים והקצאה מול חודש קודם** — header shows **סה״כ שווי נקי** as a prominent total (`current.netWorth`). Horizontal columns per asset (`AssetsMoversCard` via `computeAllocationDrift`): larger outline icon → name → **allocation %** (donut slice color, above the ₪) → larger ₪ value → MoM ₪ change → MoM allocation pp drift at the bottom. Scrolls horizontally when many types. Below the columns: **embedded asset allocation pie** (`AssetAllocationChart` `embedded` — donut only, **no legend list**; % lives on the columns).
 
